@@ -2,7 +2,7 @@ use crate::config::AppConfig;
 use crate::mouse_hook::{self, HotkeyAction};
 use crate::window_mgr;
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 #[derive(Debug, Clone, Serialize)]
@@ -76,13 +76,28 @@ pub fn apply_all_hotkeys(app: &AppHandle, cfg: &AppConfig) -> Vec<HotkeyBindResu
         mouse_bindings,
         cfg.mouse_priority.passthrough_fullscreen,
         &cfg.mouse_priority.blacklist_processes,
+        &cfg.mouse_priority.disabled_processes,
         cfg.ui.clipboard_image_freshness_secs,
     );
 
     results
 }
 
+/// Temporarily unregisters or re-registers OS-level keyboard shortcuts when entering/leaving a disabled app
+/// so keys like Alt+Space / Alt+A / Alt+S pass straight through to games without interception.
+pub fn set_keyboard_shortcuts_enabled(app: &AppHandle, enabled: bool) {
+    if !enabled {
+        let _ = app.global_shortcut().unregister_all();
+    } else {
+        let cfg = app.state::<window_mgr::AppState>().config.lock().clone();
+        let _ = apply_all_hotkeys(app, &cfg);
+    }
+}
+
 pub fn dispatch_action(app: &AppHandle, action: HotkeyAction) {
+    if window_mgr::is_suppressed_by_app(app) {
+        return;
+    }
     match action {
         HotkeyAction::TogglePopup => {
             window_mgr::toggle_popup(app, false);

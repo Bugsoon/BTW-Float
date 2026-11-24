@@ -162,10 +162,16 @@ pub fn format_mouse_binding(b: &MouseBinding) -> String {
     parts.join("+")
 }
 
+fn normalize_proc_key(name: &str) -> String {
+    let lower = name.trim().to_ascii_lowercase();
+    lower.strip_suffix(".exe").unwrap_or(&lower).to_string()
+}
+
 pub fn update_hook_config(
     bindings: Vec<(MouseBinding, HotkeyAction)>,
     passthrough_fullscreen: bool,
     blacklist_processes: &[String],
+    disabled_processes: &[String],
     freshness_secs: u64,
 ) {
     let mut guard = state().write();
@@ -174,7 +180,8 @@ pub fn update_hook_config(
     guard.freshness_secs = freshness_secs;
     guard.blacklist_lower = blacklist_processes
         .iter()
-        .map(|s| s.trim().to_ascii_lowercase())
+        .chain(disabled_processes.iter())
+        .map(|s| normalize_proc_key(s))
         .filter(|s| !s.is_empty())
         .collect();
 }
@@ -339,9 +346,10 @@ unsafe extern "system" fn low_level_mouse_proc(
                     let fg_lower = win_native::get_foreground_process_name()
                         .map(|s| s.to_ascii_lowercase())
                         .unwrap_or_default();
+                    let fg_key = normalize_proc_key(&fg_lower);
 
                     let is_own_app = fg_lower == "btw-float.exe";
-                    let in_user_blacklist = !is_own_app && guard.blacklist_lower.contains(&fg_lower);
+                    let in_user_blacklist = !is_own_app && guard.blacklist_lower.contains(&fg_key);
                     drop(guard);
 
                     if (passthrough_fs && !is_own_app && win_native::is_foreground_fullscreen())

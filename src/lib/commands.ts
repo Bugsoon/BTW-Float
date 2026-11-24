@@ -30,6 +30,11 @@ export const setPopupPin = (pinned: boolean) =>
 
 export const ballDragFinished = () => invoke<void>("ball_drag_finished");
 
+export const getBallEdgeState = () =>
+  invoke<{ edge: "none" | "left" | "right"; cssSlide: boolean }>(
+    "get_ball_edge_state"
+  );
+
 export const showBallMenu = () => invoke<void>("show_ball_menu");
 
 export const openSettings = () => invoke<void>("open_settings");

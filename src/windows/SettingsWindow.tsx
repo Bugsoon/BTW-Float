@@ -155,6 +155,201 @@ function formatMouseComboLabel(raw: string): string {
     .join(" + ");
 }
 
+function fuzzyMatchScore(query: string, target: string): number {
+  const q = query.trim().toLowerCase();
+  if (!q) return 1;
+  const t = target.toLowerCase();
+  if (t === q) return 4;
+  if (t.startsWith(q)) return 3;
+  if (t.includes(q)) return 2;
+  let qi = 0;
+  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+    if (t[ti] === q[qi]) qi++;
+  }
+  return qi === q.length ? 1 : 0;
+}
+
+function ProcessPickerSection({
+  title,
+  desc,
+  accent = "sky",
+  processes,
+  runningProcs,
+  onRefreshRunning,
+  onAdd,
+  onRemove,
+}: {
+  title: string;
+  desc: string;
+  accent?: "sky" | "rose";
+  processes: string[];
+  runningProcs: string[];
+  onRefreshRunning: () => Promise<void>;
+  onAdd: (proc: string) => void;
+  onRemove: (proc: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleToggle = async () => {
+    if (!open) {
+      setRefreshing(true);
+      await onRefreshRunning();
+      setRefreshing(false);
+    }
+    setOpen((v) => !v);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await onRefreshRunning();
+    setRefreshing(false);
+  };
+
+  const normalizedSet = new Set(
+    processes.map((p) => p.trim().toLowerCase().replace(/\.exe$/, ""))
+  );
+
+  const filteredProcs = runningProcs
+    .map((proc) => ({ proc, score: fuzzyMatchScore(query, proc) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.proc.localeCompare(b.proc));
+
+  const submitInput = () => {
+    const clean = query.trim();
+    if (!clean) return;
+    onAdd(clean);
+    setQuery("");
+  };
+
+  const chipStyle =
+    accent === "rose"
+      ? "border-rose-400/25 bg-rose-500/12 text-rose-100"
+      : "border-white/12 bg-white/8 text-slate-200";
+
+  return (
+    <div className="space-y-2.5 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-[13px] text-white">{title}</div>
+          <div className="text-[11px] text-slate-400">{desc}</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleToggle()}
+          className="flex items-center gap-1 rounded-lg border border-white/14 bg-white/8 px-2.5 py-1 text-xs text-sky-200 transition hover:bg-white/14"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>{open ? "收起选择" : "添加软件"}</span>
+        </button>
+      </div>
+
+      {processes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          {processes.map((proc) => (
+            <span
+              key={proc}
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${chipStyle}`}
+            >
+              {proc}
+              <button
+                type="button"
+                onClick={() => onRemove(proc)}
+                className="text-slate-400 hover:text-rose-300"
+                title="移除"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="space-y-2 rounded-xl border border-sky-400/25 bg-black/35 p-2.5">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitInput();
+                  }
+                }}
+                placeholder="输入关键词模糊匹配当前进程，或直接输入程序名回车添加"
+                className="w-full rounded-lg border border-white/12 bg-black/30 py-1.5 pl-8 pr-2.5 text-xs outline-none focus:border-sky-400/60 select-text"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={submitInput}
+              className="rounded-lg bg-white/12 px-3 py-1.5 text-xs hover:bg-white/20"
+            >
+              添加
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              disabled={refreshing}
+              title="刷新当前运行的进程列表"
+              className="rounded-lg border border-white/10 bg-white/6 px-2 py-1.5 text-slate-300 transition hover:bg-white/14 disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+              />
+            </button>
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
+              <span>
+                {query.trim()
+                  ? `模糊匹配到 ${filteredProcs.length} 个运行中进程（点击直接添加）：`
+                  : `点击当前正在运行的软件（共 ${runningProcs.length} 个）：`}
+              </span>
+            </div>
+            {filteredProcs.length > 0 ? (
+              <div className="glass-scroll flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+                {filteredProcs.map(({ proc }) => {
+                  const key = proc.toLowerCase().replace(/\.exe$/, "");
+                  const already = normalizedSet.has(key);
+                  return (
+                    <button
+                      key={proc}
+                      type="button"
+                      disabled={already}
+                      onClick={() => {
+                        onAdd(proc);
+                        setQuery("");
+                      }}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
+                        already
+                          ? "border-sky-400/30 bg-sky-500/15 text-sky-200 opacity-60"
+                          : "border-white/10 bg-white/6 text-slate-200 hover:border-sky-400/40 hover:bg-sky-500/20"
+                      }`}
+                    >
+                      {already ? `✓ ${proc}` : `+ ${proc}`}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-1 text-[11px] text-slate-500">
+                未找到匹配的运行中进程，可直接按回车或点击「添加」手动录入程序名
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToggleSwitch({
   checked,
   onChange,
@@ -194,9 +389,7 @@ export function SettingsWindow() {
   const [recordingField, setRecordingField] = useState<HotkeyField | null>(null);
 
   // App exception list UI
-  const [newProc, setNewProc] = useState("");
   const [runningProcs, setRunningProcs] = useState<string[]>([]);
-  const [showExceptionDrawer, setShowExceptionDrawer] = useState(false);
 
   // Per-provider model auto-discovery state
   const [scanningPid, setScanningPid] = useState<string | null>(null);
@@ -485,12 +678,18 @@ export function SettingsWindow() {
     });
   };
 
+  const refreshRunningProcesses = async () => {
+    const procs = await listRunningProcesses();
+    setRunningProcs(procs);
+  };
+
   const addBlacklistProcess = (procName: string) => {
     if (!config) return;
     const clean = procName.trim();
     if (!clean) return;
+    const key = clean.toLowerCase().replace(/\.exe$/, "");
     const exists = config.mousePriority.blacklistProcesses.some(
-      (p) => p.toLowerCase() === clean.toLowerCase()
+      (p) => p.trim().toLowerCase().replace(/\.exe$/, "") === key
     );
     if (exists) return;
     commitConfig(
@@ -520,16 +719,48 @@ export function SettingsWindow() {
           ),
         },
       },
-      "已移除例外软件"
+      "已移除侧键例外软件"
     );
   };
 
-  const toggleExceptionDrawer = async () => {
-    if (!showExceptionDrawer) {
-      const procs = await listRunningProcesses();
-      setRunningProcs(procs);
-    }
-    setShowExceptionDrawer((v) => !v);
+  const addDisabledProcess = (procName: string) => {
+    if (!config) return;
+    const clean = procName.trim();
+    if (!clean) return;
+    const key = clean.toLowerCase().replace(/\.exe$/, "");
+    const exists = (config.mousePriority.disabledProcesses ?? []).some(
+      (p) => p.trim().toLowerCase().replace(/\.exe$/, "") === key
+    );
+    if (exists) return;
+    commitConfig(
+      {
+        ...config,
+        mousePriority: {
+          ...config.mousePriority,
+          disabledProcesses: [
+            ...(config.mousePriority.disabledProcesses ?? []),
+            clean,
+          ],
+        },
+      },
+      `将在 ${clean} 中完全禁用 BTW-Float`
+    );
+  };
+
+  const removeDisabledProcess = (procName: string) => {
+    if (!config) return;
+    commitConfig(
+      {
+        ...config,
+        mousePriority: {
+          ...config.mousePriority,
+          disabledProcesses: (
+            config.mousePriority.disabledProcesses ?? []
+          ).filter((p) => p !== procName),
+        },
+      },
+      "已移除完全禁用软件"
+    );
   };
 
   if (!config) {
@@ -1370,110 +1601,27 @@ export function SettingsWindow() {
                   />
                 </div>
 
-                <div className="space-y-2.5 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="text-[13px] text-white">
-                        在指定软件里禁用鼠标侧键
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        若某个游戏、建模或设计软件本身要用侧键，加到这里即可互不冲突
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void toggleExceptionDrawer()}
-                      className="flex items-center gap-1 rounded-lg border border-white/14 bg-white/8 px-2.5 py-1 text-xs text-sky-200 transition hover:bg-white/14"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>{showExceptionDrawer ? "收起选择" : "添加软件"}</span>
-                    </button>
-                  </div>
+                <ProcessPickerSection
+                  title="在指定软件里完全禁用 BTW-Float（游戏免打扰）"
+                  desc="切换到这些软件时自动隐藏悬浮球与悬浮窗，并暂停全部快捷键与侧键；切回其他软件后自动恢复"
+                  accent="rose"
+                  processes={config.mousePriority.disabledProcesses ?? []}
+                  runningProcs={runningProcs}
+                  onRefreshRunning={refreshRunningProcesses}
+                  onAdd={addDisabledProcess}
+                  onRemove={removeDisabledProcess}
+                />
 
-                  {config.mousePriority.blacklistProcesses.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {config.mousePriority.blacklistProcesses.map((proc) => (
-                        <span
-                          key={proc}
-                          className="inline-flex items-center gap-1 rounded-full border border-white/12 bg-white/8 px-2.5 py-0.5 text-xs text-slate-200"
-                        >
-                          {proc}
-                          <button
-                            type="button"
-                            onClick={() => removeBlacklistProcess(proc)}
-                            className="text-slate-400 hover:text-rose-300"
-                            title="移除"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {showExceptionDrawer && (
-                    <div className="space-y-2 rounded-xl border border-sky-400/25 bg-black/35 p-2.5">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newProc}
-                          onChange={(e) => setNewProc(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addBlacklistProcess(newProc);
-                              setNewProc("");
-                            }
-                          }}
-                          placeholder="手动输入程序名（如 cs2.exe、blender.exe）回车添加"
-                          className="flex-1 rounded-lg border border-white/12 bg-black/30 px-2.5 py-1.5 text-xs outline-none focus:border-sky-400/60 select-text"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addBlacklistProcess(newProc);
-                            setNewProc("");
-                          }}
-                          className="rounded-lg bg-white/12 px-3 py-1.5 text-xs hover:bg-white/20"
-                        >
-                          添加
-                        </button>
-                      </div>
-
-                      {runningProcs.length > 0 && (
-                        <div>
-                          <div className="mb-1.5 text-[11px] text-slate-400">
-                            或直接点击当前正在运行的软件：
-                          </div>
-                          <div className="glass-scroll flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
-                            {runningProcs.map((proc) => {
-                              const already =
-                                config.mousePriority.blacklistProcesses.some(
-                                  (p) =>
-                                    p.toLowerCase() === proc.toLowerCase()
-                                );
-                              return (
-                                <button
-                                  key={proc}
-                                  type="button"
-                                  disabled={already}
-                                  onClick={() => addBlacklistProcess(proc)}
-                                  className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
-                                    already
-                                      ? "border-sky-400/30 bg-sky-500/15 text-sky-200 opacity-60"
-                                      : "border-white/10 bg-white/6 text-slate-200 hover:border-sky-400/40 hover:bg-sky-500/20"
-                                  }`}
-                                >
-                                  {already ? `✓ ${proc}` : `+ ${proc}`}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ProcessPickerSection
+                  title="在指定软件里仅禁用鼠标侧键"
+                  desc="若某个软件本身要用侧键，加到这里即可放行侧键，悬浮球与键盘快捷键仍可正常使用"
+                  accent="sky"
+                  processes={config.mousePriority.blacklistProcesses}
+                  runningProcs={runningProcs}
+                  onRefreshRunning={refreshRunningProcesses}
+                  onAdd={addBlacklistProcess}
+                  onRemove={removeBlacklistProcess}
+                />
               </div>
             </div>
           )}

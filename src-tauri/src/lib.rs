@@ -37,12 +37,14 @@ fn save_app_config(
     }
 
     if let Some(ball) = app.get_webview_window("ball") {
-        if show_ball {
+        if show_ball && !window_mgr::is_suppressed_by_app(&app) {
             let _ = ball.show();
         } else {
             let _ = ball.hide();
         }
     }
+    window_mgr::apply_ball_edge_setting(&app);
+    window_mgr::refresh_app_suppression(&app);
 
     let bind_results = hotkey::apply_all_hotkeys(&app, &new_config);
     let _ = app.emit("config:updated", &new_config);
@@ -106,6 +108,11 @@ fn set_popup_pin(app: AppHandle, pinned: bool) {
 #[tauri::command]
 fn ball_drag_finished(app: AppHandle) {
     window_mgr::sync_ball_after_drag(&app);
+}
+
+#[tauri::command]
+fn get_ball_edge_state(app: AppHandle) -> window_mgr::BallEdgePayload {
+    window_mgr::get_ball_edge_state(&app)
 }
 
 #[tauri::command]
@@ -205,6 +212,7 @@ pub fn run() {
 
             tray::init_tray(&handle)?;
             window_mgr::init_windows(&handle);
+            window_mgr::start_foreground_watcher(&handle);
 
             // Start 60s fresh clipboard image watcher
             clipboard_watch::start_clipboard_watcher();
@@ -243,6 +251,7 @@ pub fn run() {
             resize_popup,
             set_popup_pin,
             ball_drag_finished,
+            get_ball_edge_state,
             show_ball_menu,
             open_settings,
             set_mouse_recording,

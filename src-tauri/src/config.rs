@@ -41,6 +41,8 @@ pub struct MousePriorityConfig {
     pub passthrough_fullscreen: bool,
     #[serde(default = "default_blacklist")]
     pub blacklist_processes: Vec<String>,
+    #[serde(default = "default_blacklist")]
+    pub disabled_processes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +112,7 @@ impl Default for MousePriorityConfig {
         Self {
             passthrough_fullscreen: true,
             blacklist_processes: default_blacklist(),
+            disabled_processes: default_blacklist(),
         }
     }
 }

@@ -28,6 +28,7 @@ export interface HotkeyConfig {
 export interface MousePriorityConfig {
   passthroughFullscreen: boolean;
   blacklistProcesses: string[];
+  disabledProcesses: string[];
 }
 
 export interface UiConfig {

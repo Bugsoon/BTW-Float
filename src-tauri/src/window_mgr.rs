@@ -1,6 +1,7 @@
 use crate::capture;
 use crate::clipboard_watch;
 use crate::config::{save_config, AppConfig};
+use crate::hotkey;
 use crate::llm::StreamRegistry;
 use crate::selection;
 use crate::tray;
@@ -8,7 +9,7 @@ use crate::win_native::{self, BallInputEvent};
 use parking_lot::Mutex;
 use serde::Serialize;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{
@@ -18,6 +19,11 @@ use tauri::{
 
 // Shadow gutter sized to exceed Chromium/Skia's exact 3*sigma Gaussian blur cutoff (zero box clipping)
 pub const BALL_WIN_LOGICAL_SIZE: f64 = 86.0;
+const BALL_ORB_LOGICAL_SIZE: f64 = 52.0;
+const BALL_GUTTER_LOGICAL: f64 = (BALL_WIN_LOGICAL_SIZE - BALL_ORB_LOGICAL_SIZE) / 2.0; // 17.0
+const BALL_EDGE_SNAP_THRESHOLD_LOGICAL: f64 = 26.0;
+const BALL_EDGE_MARGIN_LOGICAL: f64 = 4.0;
+const BALL_PEEK_VISIBLE_LOGICAL: f64 = 18.0;
 pub const POPUP_WIN_LOGICAL_WIDTH: f64 = 584.0;
 pub const POPUP_PAD_TOP_LOGICAL: f64 = 15.0;
 pub const POPUP_PAD_BOTTOM_LOGICAL: f64 = 27.0;
@@ -36,6 +42,36 @@ pub struct PopupPrefillPayload {
     pub auto_submit: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BallEdge {
+    #[default]
+    None,
+    Left,
+    Right,
+}
+
+impl BallEdge {
+    fn as_str(self) -> &'static str {
+        match self {
+            BallEdge::None => "none",
+            BallEdge::Left => "left",
+            BallEdge::Right => "right",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct BallDockState {
+    pub edge: BallEdge,
+    pub css_slide: bool,
+    pub expanded_x: i32,
+    pub tucked_x: i32,
+    pub y: i32,
+    pub hovered: bool,
+    pub dragging: bool,
+    pub tucked: bool,
+}
+
 pub struct AppState {
     pub config: Mutex<AppConfig>,
     pub streams: Arc<StreamRegistry>,
@@ -44,6 +80,9 @@ pub struct AppState {
     pub last_popup_shown: Mutex<Instant>,
     pub last_popup_blur_hidden: Mutex<Option<Instant>>,
     pub pending_prefill: Mutex<Option<PopupPrefillPayload>>,
+    pub ball_dock: Mutex<BallDockState>,
+    pub ball_anim_gen: AtomicU64,
+    pub suppressed_by_app: AtomicBool,
 }
 
 impl AppState {
@@ -56,14 +95,18 @@ impl AppState {
             last_popup_shown: Mutex::new(Instant::now() - Duration::from_secs(10)),
             last_popup_blur_hidden: Mutex::new(None),
             pending_prefill: Mutex::new(None),
+            ball_dock: Mutex::new(BallDockState::default()),
+            ball_anim_gen: AtomicU64::new(0),
+            suppressed_by_app: AtomicBool::new(false),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct BallEdgePayload {
-    edge: String, // "none" | "left" | "right"
+pub struct BallEdgePayload {
+    pub edge: String, // "none" | "left" | "right"
+    pub css_slide: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -95,6 +138,7 @@ pub fn init_windows(app: &AppHandle) {
             }
         };
         let _ = ball.set_position(Position::Physical(PhysicalPosition::new(bx, by)));
+        evaluate_and_apply_ball_dock(app, false, true);
 
         if let Ok(hwnd) = ball.hwnd() {
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<BallInputEvent>();
@@ -105,6 +149,10 @@ pub fn init_windows(app: &AppHandle) {
                 while let Some(ev) = rx.recv().await {
                     match ev {
                         BallInputEvent::Hover(h) => {
+                            {
+                                let state = ball_app.state::<AppState>();
+                                state.ball_dock.lock().hovered = h;
+                            }
                             if let Some(b) = ball_app.get_webview_window("ball") {
                                 let _ = b.emit(
                                     "ball:ui-state",
@@ -113,6 +161,15 @@ pub fn init_windows(app: &AppHandle) {
                                         pressed: None,
                                     },
                                 );
+                            }
+                            if h {
+                                ball_app
+                                    .state::<AppState>()
+                                    .ball_anim_gen
+                                    .fetch_add(1, Ordering::SeqCst);
+                                expand_ball_if_tucked(&ball_app);
+                            } else {
+                                schedule_ball_tuck(&ball_app, 240);
                             }
                         }
                         BallInputEvent::Press(p) => {
@@ -134,6 +191,26 @@ pub fn init_windows(app: &AppHandle) {
                             let _ = ball_app.run_on_main_thread(move || {
                                 let _ = tray::show_ball_context_menu(&app_for_menu);
                             });
+                        }
+                        BallInputEvent::DragStarted => {
+                            let state = ball_app.state::<AppState>();
+                            state.ball_anim_gen.fetch_add(1, Ordering::SeqCst);
+                            {
+                                let mut dock = state.ball_dock.lock();
+                                dock.dragging = true;
+                                dock.edge = BallEdge::None;
+                                dock.css_slide = false;
+                                dock.tucked = false;
+                            }
+                            if let Some(b) = ball_app.get_webview_window("ball") {
+                                let _ = b.emit(
+                                    "ball:edge-state",
+                                    BallEdgePayload {
+                                        edge: "none".to_string(),
+                                        css_slide: false,
+                                    },
+                                );
+                            }
                         }
                         BallInputEvent::DragEnded => {
                             sync_ball_after_drag(&ball_app);
@@ -251,6 +328,7 @@ pub fn open_popup_with_prefill(
             .unwrap_or(false);
 
     let (target_x, target_y) = if near_ball || ball_visible {
+        expand_ball_if_tucked(app);
         compute_near_ball_pos(app, phys_w, phys_h, scale)
     } else if prefill.as_ref().and_then(|p| p.text.as_ref()).is_some() {
         // When triggered on highlighted text (e.g. reading a paper), pop up right near the cursor!
@@ -270,15 +348,21 @@ pub fn open_popup_with_prefill(
 fn compute_near_ball_pos(app: &AppHandle, phys_w: i32, phys_h: i32, scale: f64) -> (i32, i32) {
     if let Some(ball) = app.get_webview_window("ball") {
         if let (Ok(pos), Ok(size)) = (ball.outer_position(), ball.outer_size()) {
-            let cx = pos.x + (size.width as i32) / 2;
-            let cy = pos.y + (size.height as i32) / 2;
+            let dock = *app.state::<AppState>().ball_dock.lock();
+            let (ref_x, ref_y) = if dock.edge != BallEdge::None {
+                (dock.expanded_x, dock.y)
+            } else {
+                (pos.x, pos.y)
+            };
+            let cx = ref_x + (size.width as i32) / 2;
+            let cy = ref_y + (size.height as i32) / 2;
             let area = win_native::get_monitor_work_area_for_point(cx, cy);
             let overlap = (6.0 * scale).round() as i32;
 
             let x = if cx > (area.left + area.right) / 2 {
-                pos.x - phys_w + overlap
+                ref_x - phys_w + overlap
             } else {
-                pos.x + size.width as i32 - overlap
+                ref_x + size.width as i32 - overlap
             };
             let clamped_x = x.clamp(area.left + 4, (area.right - phys_w - 4).max(area.left + 4));
             let clamped_y = (cy - phys_h / 2)
@@ -363,6 +447,7 @@ pub fn hide_popup_and_clear(app: &AppHandle) {
         let _ = popup.set_size(Size::Physical(PhysicalSize::new(phys_w, phys_h)));
         let _ = popup.emit("popup:reset", ());
     }
+    schedule_ball_tuck(app, 240);
 }
 
 pub fn resize_popup(app: &AppHandle, logical_content_height: f64) {
@@ -411,7 +496,9 @@ fn hide_own_windows_for_capture(app: &AppHandle) {
 }
 
 fn restore_ball_after_capture(app: &AppHandle) {
-    let show_ball = app.state::<AppState>().config.lock().ui.show_ball;
+    let state = app.state::<AppState>();
+    let show_ball =
+        state.config.lock().ui.show_ball && !state.suppressed_by_app.load(Ordering::SeqCst);
     if show_ball {
         if let Some(ball) = app.get_webview_window("ball") {
             if let Ok(hwnd) = ball.hwnd() {
@@ -592,7 +679,7 @@ pub fn toggle_ball_visibility(app: &AppHandle) -> bool {
     drop(cfg);
 
     if let Some(ball) = app.get_webview_window("ball") {
-        if visible {
+        if visible && !state.suppressed_by_app.load(Ordering::SeqCst) {
             let _ = ball.show();
         } else {
             let _ = ball.hide();
@@ -601,7 +688,225 @@ pub fn toggle_ball_visibility(app: &AppHandle) -> bool {
     visible
 }
 
-pub fn sync_ball_after_drag(app: &AppHandle) {
+pub fn is_suppressed_by_app(app: &AppHandle) -> bool {
+    app.state::<AppState>()
+        .suppressed_by_app
+        .load(Ordering::SeqCst)
+}
+
+fn normalize_proc_key(name: &str) -> String {
+    let lower = name.trim().to_ascii_lowercase();
+    lower.strip_suffix(".exe").unwrap_or(&lower).to_string()
+}
+
+fn is_foreground_process_disabled(app: &AppHandle) -> bool {
+    let disabled_list: Vec<String> = app
+        .state::<AppState>()
+        .config
+        .lock()
+        .mouse_priority
+        .disabled_processes
+        .clone();
+    if disabled_list.is_empty() {
+        return false;
+    }
+    let Some(fg) = win_native::get_foreground_process_name() else {
+        return false;
+    };
+    let fg_lower = fg.to_ascii_lowercase();
+    if fg_lower == "btw-float.exe" {
+        return false;
+    }
+    let fg_key = normalize_proc_key(&fg_lower);
+    disabled_list
+        .iter()
+        .any(|p| !p.trim().is_empty() && normalize_proc_key(p) == fg_key)
+}
+
+fn apply_suppression_state(app: &AppHandle, suppressed: bool) {
+    let state = app.state::<AppState>();
+    let prev = state.suppressed_by_app.swap(suppressed, Ordering::SeqCst);
+    if prev == suppressed {
+        return;
+    }
+
+    if suppressed {
+        if state.popup_open.load(Ordering::SeqCst) {
+            hide_popup_and_clear(app);
+        }
+        if let Some(ball) = app.get_webview_window("ball") {
+            if let Ok(hwnd) = ball.hwnd() {
+                win_native::hide_hwnd_now(hwnd.0 as isize);
+            }
+        }
+        hotkey::set_keyboard_shortcuts_enabled(app, false);
+    } else {
+        hotkey::set_keyboard_shortcuts_enabled(app, true);
+        let show_ball = state.config.lock().ui.show_ball;
+        if show_ball {
+            if let Some(ball) = app.get_webview_window("ball") {
+                if let Ok(hwnd) = ball.hwnd() {
+                    win_native::show_hwnd_noactivate(hwnd.0 as isize);
+                }
+            }
+        }
+    }
+}
+
+pub fn refresh_app_suppression(app: &AppHandle) {
+    let should_suppress = is_foreground_process_disabled(app);
+    apply_suppression_state(app, should_suppress);
+}
+
+/// Lightweight foreground window watcher (~250ms) that auto-hides ball & popup and pauses shortcuts
+/// whenever the active foreground window belongs to a user-configured disabled process (e.g. games).
+pub fn start_foreground_watcher(app: &AppHandle) {
+    let handle = app.clone();
+    std::thread::Builder::new()
+        .name("btw-fg-watcher".into())
+        .spawn(move || {
+            let mut last_hwnd: isize = 0;
+            loop {
+                std::thread::sleep(Duration::from_millis(250));
+                let has_rules = !handle
+                    .state::<AppState>()
+                    .config
+                    .lock()
+                    .mouse_priority
+                    .disabled_processes
+                    .is_empty();
+                if !has_rules {
+                    if is_suppressed_by_app(&handle) {
+                        apply_suppression_state(&handle, false);
+                    }
+                    last_hwnd = 0;
+                    continue;
+                }
+
+                let cur_hwnd = win_native::get_foreground_hwnd();
+                if cur_hwnd == last_hwnd {
+                    continue;
+                }
+                last_hwnd = cur_hwnd;
+
+                let should_suppress = is_foreground_process_disabled(&handle);
+                apply_suppression_state(&handle, should_suppress);
+            }
+        })
+        .ok();
+}
+
+pub fn get_ball_edge_state(app: &AppHandle) -> BallEdgePayload {
+    let dock = *app.state::<AppState>().ball_dock.lock();
+    BallEdgePayload {
+        edge: dock.edge.as_str().to_string(),
+        css_slide: dock.css_slide,
+    }
+}
+
+fn animate_ball_x(app: &AppHandle, target_x: i32, y: i32, duration_ms: u64, gen: u64) {
+    let Some(ball) = app.get_webview_window("ball") else {
+        return;
+    };
+    let Ok(pos) = ball.outer_position() else {
+        return;
+    };
+    let Ok(hwnd) = ball.hwnd() else {
+        return;
+    };
+    let start_x = pos.x;
+    if start_x == target_x {
+        return;
+    }
+    let hwnd_raw = hwnd.0 as isize;
+    let app_clone = app.clone();
+
+    tauri::async_runtime::spawn(async move {
+        let steps = ((duration_ms as f64) / 12.0).round().max(1.0) as u32;
+        let step_dur = Duration::from_millis((duration_ms / steps as u64).max(8));
+        for i in 1..=steps {
+            if app_clone
+                .state::<AppState>()
+                .ball_anim_gen
+                .load(Ordering::SeqCst)
+                != gen
+            {
+                return;
+            }
+            let t = i as f64 / steps as f64;
+            let eased = 1.0 - (1.0 - t).powi(3);
+            let cur_x = start_x + ((target_x - start_x) as f64 * eased).round() as i32;
+            win_native::set_hwnd_position(hwnd_raw, cur_x, y);
+            if i < steps {
+                tokio::time::sleep(step_dur).await;
+            }
+        }
+    });
+}
+
+fn expand_ball_if_tucked(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let target = {
+        let mut dock = state.ball_dock.lock();
+        if dock.edge != BallEdge::None && !dock.css_slide && dock.tucked {
+            dock.tucked = false;
+            Some((dock.expanded_x, dock.y))
+        } else {
+            None
+        }
+    };
+    if let Some((expanded_x, y)) = target {
+        let gen = state.ball_anim_gen.fetch_add(1, Ordering::SeqCst) + 1;
+        animate_ball_x(app, expanded_x, y, 150, gen);
+    }
+}
+
+fn schedule_ball_tuck(app: &AppHandle, delay_ms: u64) {
+    let state = app.state::<AppState>();
+    let auto_hide_edge = state.config.lock().ui.ball_auto_hide_edge;
+    if !auto_hide_edge {
+        return;
+    }
+    {
+        let dock = state.ball_dock.lock();
+        if dock.edge == BallEdge::None || dock.css_slide || dock.hovered || dock.dragging {
+            return;
+        }
+    }
+    if state.popup_open.load(Ordering::SeqCst) {
+        return;
+    }
+
+    let gen = state.ball_anim_gen.fetch_add(1, Ordering::SeqCst) + 1;
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if delay_ms > 0 {
+            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        }
+        let state = app_clone.state::<AppState>();
+        if state.ball_anim_gen.load(Ordering::SeqCst) != gen {
+            return;
+        }
+        if !state.config.lock().ui.ball_auto_hide_edge || state.popup_open.load(Ordering::SeqCst) {
+            return;
+        }
+        let target = {
+            let mut dock = state.ball_dock.lock();
+            if dock.edge == BallEdge::None || dock.css_slide || dock.hovered || dock.dragging {
+                return;
+            }
+            dock.tucked = true;
+            (dock.tucked_x, dock.y)
+        };
+        animate_ball_x(&app_clone, target.0, target.1, 200, gen);
+    });
+}
+
+fn evaluate_and_apply_ball_dock(
+    app: &AppHandle,
+    save_pos: bool,
+    allow_immediate_tuck: bool,
+) {
     let Some(ball) = app.get_webview_window("ball") else {
         return;
     };
@@ -611,46 +916,132 @@ pub fn sync_ball_after_drag(app: &AppHandle) {
     let Ok(size) = ball.outer_size() else {
         return;
     };
-
-    let cx = pos.x + size.width as i32 / 2;
-    let cy = pos.y + size.height as i32 / 2;
-    let area = win_native::get_monitor_work_area_for_point(cx, cy);
+    let scale = ball.scale_factor().unwrap_or(1.0);
+    let phys_w = size.width as i32;
+    let phys_h = size.height as i32;
 
     let state = app.state::<AppState>();
+    state.ball_anim_gen.fetch_add(1, Ordering::SeqCst);
+
+    // If ball was previously tucked off-edge, evaluate using its expanded anchor position
+    let prev_dock = *state.ball_dock.lock();
+    let eval_x = if prev_dock.tucked && prev_dock.edge != BallEdge::None {
+        prev_dock.expanded_x
+    } else {
+        pos.x
+    };
+
+    let cx = eval_x + phys_w / 2;
+    let cy = pos.y + phys_h / 2;
+    let area = win_native::get_monitor_work_area_for_point(cx, cy);
     let auto_hide_edge = state.config.lock().ui.ball_auto_hide_edge;
 
-    let mut final_x = pos.x.clamp(area.left, area.right - size.width as i32);
-    let final_y = pos.y.clamp(area.top + 4, area.bottom - size.height as i32 - 4);
-    let mut edge = "none";
+    let gutter = (BALL_GUTTER_LOGICAL * scale).round() as i32;
+    let margin = (BALL_EDGE_MARGIN_LOGICAL * scale).round() as i32;
+    let threshold = (BALL_EDGE_SNAP_THRESHOLD_LOGICAL * scale).round() as i32;
+    let peek_visible = (BALL_PEEK_VISIBLE_LOGICAL * scale).round() as i32;
+    let orb_phys = (BALL_ORB_LOGICAL_SIZE * scale).round() as i32;
+
+    let min_x = area.left - gutter + margin;
+    let max_x = area.right - phys_w + gutter - margin;
+    let clamped_x = eval_x.clamp(min_x, max_x.max(min_x));
+    let final_y = pos.y.clamp(area.top + 4, (area.bottom - phys_h - 4).max(area.top + 4));
+
+    let orb_left = clamped_x + gutter;
+    let orb_right = clamped_x + phys_w - gutter;
+
+    let mut edge = BallEdge::None;
+    let mut css_slide = false;
+    let mut expanded_x = clamped_x;
+    let mut tucked_x = clamped_x;
 
     if auto_hide_edge {
-        let threshold = 22;
-        if final_x - area.left <= threshold {
-            final_x = area.left;
-            edge = "left";
-        } else if area.right - (final_x + size.width as i32) <= threshold {
-            final_x = area.right - size.width as i32;
-            edge = "right";
+        if orb_left - area.left <= threshold {
+            edge = BallEdge::Left;
+            css_slide = win_native::has_adjacent_monitor_on_side(cx, cy, false);
+            if css_slide {
+                expanded_x = area.left;
+                tucked_x = area.left;
+            } else {
+                expanded_x = area.left - gutter + margin;
+                tucked_x = area.left - (orb_phys - peek_visible + gutter);
+            }
+        } else if area.right - orb_right <= threshold {
+            edge = BallEdge::Right;
+            css_slide = win_native::has_adjacent_monitor_on_side(cx, cy, true);
+            if css_slide {
+                expanded_x = area.right - phys_w;
+                tucked_x = area.right - phys_w;
+            } else {
+                expanded_x = area.right - phys_w + gutter - margin;
+                tucked_x = area.right - (peek_visible + gutter);
+            }
         }
     }
 
-    if final_x != pos.x || final_y != pos.y {
-        let _ = ball.set_position(Position::Physical(PhysicalPosition::new(final_x, final_y)));
-    }
+    let (mx, my) = win_native::get_cursor_pos();
+    let cursor_inside = mx >= expanded_x
+        && mx <= expanded_x + phys_w
+        && my >= final_y
+        && my <= final_y + phys_h;
+
+    let should_tuck_now = allow_immediate_tuck
+        && edge != BallEdge::None
+        && !css_slide
+        && !cursor_inside
+        && !state.popup_open.load(Ordering::SeqCst);
+
+    let target_x = if should_tuck_now { tucked_x } else { expanded_x };
 
     {
+        let mut dock = state.ball_dock.lock();
+        dock.edge = edge;
+        dock.css_slide = css_slide;
+        dock.expanded_x = expanded_x;
+        dock.tucked_x = tucked_x;
+        dock.y = final_y;
+        dock.dragging = false;
+        dock.hovered = cursor_inside;
+        dock.tucked = should_tuck_now;
+    }
+
+    if target_x != pos.x || final_y != pos.y {
+        let _ = ball.set_position(Position::Physical(PhysicalPosition::new(target_x, final_y)));
+    }
+
+    if save_pos {
         let mut cfg = state.config.lock();
-        cfg.ui.ball_x = Some(final_x);
+        cfg.ui.ball_x = Some(expanded_x);
         cfg.ui.ball_y = Some(final_y);
         let _ = save_config(&cfg);
     }
 
     let _ = ball.emit(
-        "ball:edge-state",
-        BallEdgePayload {
-            edge: edge.to_string(),
+        "ball:ui-state",
+        BallUiStatePayload {
+            hovered: Some(cursor_inside),
+            pressed: Some(false),
         },
     );
+    let _ = ball.emit(
+        "ball:edge-state",
+        BallEdgePayload {
+            edge: edge.as_str().to_string(),
+            css_slide,
+        },
+    );
+
+    if !should_tuck_now && edge != BallEdge::None && !css_slide && !cursor_inside {
+        schedule_ball_tuck(app, 220);
+    }
+}
+
+pub fn apply_ball_edge_setting(app: &AppHandle) {
+    evaluate_and_apply_ball_dock(app, true, false);
+}
+
+pub fn sync_ball_after_drag(app: &AppHandle) {
+    evaluate_and_apply_ball_dock(app, true, false);
 }
 
 /// Spawns settings window creation off the UI thread to prevent WebView2 creation deadlock on Windows.

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Sparkles } from "lucide-react";
+import { getBallEdgeState } from "../lib/commands";
 import { useSystemDark } from "../lib/theme";
 
 interface BallUiState {
@@ -8,16 +9,31 @@ interface BallUiState {
   pressed?: boolean | null;
 }
 
+interface BallEdgeState {
+  edge: "none" | "left" | "right";
+  cssSlide: boolean;
+}
+
 export function BallWindow() {
   const isDark = useSystemDark();
-  const [edge, setEdge] = useState<"none" | "left" | "right">("none");
+  const [edgeState, setEdgeState] = useState<BallEdgeState>({
+    edge: "none",
+    cssSlide: false,
+  });
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
 
   useEffect(() => {
+    void getBallEdgeState()
+      .then((state) => setEdgeState(state))
+      .catch(() => {});
+
     const unlistenPromises = [
-      listen<{ edge: "none" | "left" | "right" }>("ball:edge-state", (ev) => {
-        setEdge(ev.payload.edge);
+      listen<BallEdgeState>("ball:edge-state", (ev) => {
+        setEdgeState({
+          edge: ev.payload.edge,
+          cssSlide: Boolean(ev.payload.cssSlide),
+        });
       }),
       listen<BallUiState>("ball:ui-state", (ev) => {
         if (typeof ev.payload.hovered === "boolean") {
@@ -37,21 +53,24 @@ export function BallWindow() {
     };
   }, []);
 
-  const isPeeked = edge !== "none" && !hovered;
+  const isPeeked = edgeState.edge !== "none" && !hovered;
+  const cssOffsetX =
+    isPeeked && edgeState.cssSlide
+      ? edgeState.edge === "left"
+        ? -51
+        : 51
+      : 0;
+  const scale = pressed ? 0.92 : hovered ? 1.05 : 1;
 
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden bg-transparent pb-1">
       <div
-        className={`relative flex h-[52px] w-[52px] items-center justify-center rounded-full transition-all duration-150 ${
+        className={`relative flex h-[52px] w-[52px] items-center justify-center rounded-full transition-all duration-200 ease-out ${
           isDark ? "frosted-orb-dark" : "frosted-orb-light"
         }`}
         style={{
-          opacity: isPeeked ? 0.68 : 1,
-          transform: pressed
-            ? "scale(0.92)"
-            : hovered
-            ? "scale(1.05)"
-            : "scale(1)",
+          opacity: isPeeked ? 0.74 : 1,
+          transform: `translateX(${cssOffsetX}px) scale(${scale})`,
         }}
       >
         {/* Subtle acrylic top gloss */}

@@ -15,6 +15,7 @@ pub enum BallInputEvent {
     Press(bool),
     LeftClick,
     RightClick,
+    DragStarted,
     DragEnded,
     DroppedFiles(Vec<String>),
 }
@@ -37,7 +38,7 @@ mod imp {
     };
     use windows::Win32::Graphics::Gdi::{
         GetMonitorInfoW, MonitorFromPoint, MonitorFromWindow, MONITORINFO,
-        MONITOR_DEFAULTTONEAREST,
+        MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTONULL,
     };
     use windows::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
@@ -150,6 +151,7 @@ mod imp {
                 let mut emit_hover = false;
                 let mut move_target: Option<(i32, i32)> = None;
                 let mut emit_unpress = false;
+                let mut emit_drag_started = false;
                 let tx_clone;
 
                 {
@@ -175,6 +177,7 @@ mod imp {
                             if !st.is_dragging && (dx * dx + dy * dy) > 25 {
                                 st.is_dragging = true;
                                 emit_unpress = true;
+                                emit_drag_started = true;
                             }
                             if st.is_dragging {
                                 move_target = Some((st.down_win.x + dx, st.down_win.y + dy));
@@ -197,6 +200,9 @@ mod imp {
                 if let Some(tx) = tx_clone {
                     if emit_hover {
                         let _ = tx.send(BallInputEvent::Hover(true));
+                    }
+                    if emit_drag_started {
+                        let _ = tx.send(BallInputEvent::DragStarted);
                     }
                     if emit_unpress {
                         let _ = tx.send(BallInputEvent::Press(false));
@@ -245,6 +251,7 @@ mod imp {
                     let wdrag = st.is_dragging;
                     st.is_down = false;
                     st.is_dragging = false;
+                    st.tracking_leave = false;
                     (wd, wdrag, st.tx.clone())
                 };
                 if was_down {
@@ -310,6 +317,41 @@ mod imp {
     pub fn show_hwnd_noactivate(hwnd_raw: isize) {
         unsafe {
             let _ = ShowWindow(HWND(hwnd_raw as _), SW_SHOWNOACTIVATE);
+        }
+    }
+
+    pub fn set_hwnd_position(hwnd_raw: isize, x: i32, y: i32) {
+        unsafe {
+            let _ = SetWindowPos(
+                HWND(hwnd_raw as _),
+                HWND::default(),
+                x,
+                y,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+    }
+
+    /// Returns true if another monitor exists immediately past the left or right edge of the monitor containing `(cx, cy)`.
+    pub fn has_adjacent_monitor_on_side(cx: i32, cy: i32, right_side: bool) -> bool {
+        unsafe {
+            let hmon = MonitorFromPoint(POINT { x: cx, y: cy }, MONITOR_DEFAULTTONEAREST);
+            let mut info = MONITORINFO {
+                cbSize: size_of::<MONITORINFO>() as u32,
+                ..Default::default()
+            };
+            if !GetMonitorInfoW(hmon, &mut info).as_bool() {
+                return false;
+            }
+            let probe_x = if right_side {
+                info.rcMonitor.right + 8
+            } else {
+                info.rcMonitor.left - 8
+            };
+            let adjacent = MonitorFromPoint(POINT { x: probe_x, y: cy }, MONITOR_DEFAULTTONULL);
+            !adjacent.0.is_null()
         }
     }
 
@@ -405,6 +447,10 @@ mod imp {
                 }
             }
         }
+    }
+
+    pub fn get_foreground_hwnd() -> isize {
+        unsafe { GetForegroundWindow().0 as isize }
     }
 
     pub fn get_foreground_process_name() -> Option<String> {
@@ -647,6 +693,12 @@ pub fn hide_hwnd_now(_: isize) {}
 #[cfg(not(windows))]
 pub fn show_hwnd_noactivate(_: isize) {}
 #[cfg(not(windows))]
+pub fn set_hwnd_position(_: isize, _: i32, _: i32) {}
+#[cfg(not(windows))]
+pub fn has_adjacent_monitor_on_side(_: i32, _: i32, _: bool) -> bool {
+    false
+}
+#[cfg(not(windows))]
 pub fn show_and_focus_popup(_: isize) {}
 #[cfg(not(windows))]
 pub fn apply_win11_rounded_corners(_: isize) {}
@@ -664,6 +716,10 @@ pub fn get_monitor_work_area_for_point(_: i32, _: i32) -> WorkArea {
         right: 1920,
         bottom: 1040,
     }
+}
+#[cfg(not(windows))]
+pub fn get_foreground_hwnd() -> isize {
+    0
 }
 #[cfg(not(windows))]
 pub fn get_foreground_process_name() -> Option<String> {
