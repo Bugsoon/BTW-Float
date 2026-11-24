@@ -45,6 +45,12 @@
 
 ## 快速开始
 
+### 直接安装（普通用户）
+
+前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载 `BTW-Float_1.0.0_x64-setup.exe`，双击安装即可，无需安装 Node.js 或 Rust。
+
+> 安装包未做代码签名，Windows SmartScreen 可能提示「未知发布者」。点击 **更多信息 → 仍要运行** 即可。
+
 ### 环境要求
 
 - **操作系统**：Windows 11（需已安装 WebView2 Runtime，Win11 默认自带）
@@ -85,7 +91,7 @@ cargo test
 ## 目录结构
 
 ```text
-E:\BTW
+BTW-Float/
 ├── README.md                  # 项目说明与使用指南
 ├── docs/
 │   └── SPEC.md                # 技术架构与功能规格文档
