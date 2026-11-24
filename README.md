@@ -1,5 +1,9 @@
 # BTW-Float
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Platform: Windows 11](https://img.shields.io/badge/Platform-Windows%2011-0078D6.svg)
+![Tauri v2](https://img.shields.io/badge/Tauri-v2-24C8DB.svg)
+
 > 面向 Windows 11 的轻量 `/btw` 风格桌面 AI 悬浮球助手。随手呼出、问完即走、关闭自动清空。
 
 基于 **Tauri v2 (Rust) + React 19 + TypeScript + Tailwind CSS v4** 构建，原生接入 Windows 11 Win32 API（低级鼠标钩子、UI Automation 划词读取、剪贴板监听、高分屏截屏与 DPAPI 本地加密）。
@@ -142,3 +146,17 @@ BTW-Float/
 ## 更多文档
 
 - 架构设计与技术细节请参阅 [docs/SPEC.md](./docs/SPEC.md)。
+
+---
+
+## 开源协议
+
+本项目采用 [MIT License](./LICENSE) 开源发布。
+
+```
+MIT License
+
+Copyright (c) 2026 Bugsoon
+```
+
+你可以自由地使用、复制、修改、合并、发布、再授权和/或销售本软件的副本，包括用于商业目的，唯一要求是保留上述版权声明和本许可声明。本软件按「原样」提供，不提供任何形式的担保。
