@@ -20,3 +20,6 @@ Thumbs.db
 
 # pi agent local state
 .pi/
+
+# Local promotional media (hosted via GitHub user-attachments)
+promo/

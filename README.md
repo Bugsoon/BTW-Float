@@ -6,6 +6,8 @@
 
 > 面向 Windows 11 的轻量 `/btw` 风格桌面 AI 悬浮球助手。随手呼出、问完即走、关闭自动清空。
 
+https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
+
 基于 **Tauri v2 (Rust) + React 19 + TypeScript + Tailwind CSS v4** 构建，原生接入 Windows 11 Win32 API（低级鼠标钩子、UI Automation 划词读取、剪贴板监听、高分屏截屏与 DPAPI 本地加密）。
 
 ---
