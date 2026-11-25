@@ -191,3 +191,41 @@ jobs:
               gh release create $tag $installerPath $sumsPath --title "BTW-Float $tag" --generate-notes --notes-file $finalNotesPath --latest --repo $repo
             }
           }
+
+      - name: Update Scoop bucket manifest on main
+        if: steps.meta.outputs.publish == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $ver = $tag.TrimStart("v")
+          $installerName = "${{ steps.checksum.outputs.installer_name }}"
+          $installerSha = "${{ steps.checksum.outputs.installer_sha256 }}"
+          $bucketFile = "bucket/btw-float.json"
+
+          git fetch origin main
+          git checkout -B main origin/main
+          if (-not (Test-Path $bucketFile)) {
+            Write-Host "No Scoop manifest found at $bucketFile, skipping."
+            exit 0
+          }
+
+          $manifest = Get-Content -Raw $bucketFile | ConvertFrom-Json
+          $newUrl = "https://github.com/${{ github.repository }}/releases/download/$tag/$installerName#/dl.7z"
+          if ($manifest.version -eq $ver -and $manifest.architecture.'64bit'.hash -eq $installerSha) {
+            Write-Host "Scoop manifest already up to date for $ver."
+            exit 0
+          }
+
+          $manifest.version = $ver
+          $manifest.architecture.'64bit'.url = $newUrl
+          $manifest.architecture.'64bit'.hash = $installerSha
+          $json = ($manifest | ConvertTo-Json -Depth 10) + "`n"
+          [System.IO.File]::WriteAllText((Resolve-Path $bucketFile), $json, [System.Text.UTF8Encoding]::new($false))
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $bucketFile
+          git commit -m "chore(scoop): bump btw-float to $ver [skip ci]"
+          git push origin main

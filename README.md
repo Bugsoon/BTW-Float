@@ -52,7 +52,16 @@
 
 ### 直接安装（普通用户）
 
-前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载最新版安装包（如 `BTW-Float_1.1.1_x64-setup.exe`），双击安装即可，无需安装 Node.js 或 Rust。
+- **安装包直装**：前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载最新版安装包（如 `BTW-Float_1.1.1_x64-setup.exe`），双击安装即可，无需安装 Node.js 或 Rust。
+- **通过 Scoop 安装**：
+  ```powershell
+  scoop bucket add btw-float https://github.com/Bugsoon/BTW-Float
+  scoop install btw-float/btw-float
+  ```
+- **通过 Winget 安装**（等待 `microsoft/winget-pkgs` PR 合入后可用）：
+  ```powershell
+  winget install Bugsoon.BTW-Float
+  ```
 
 > 安装包未做代码签名，Windows SmartScreen 可能提示「未知发布者」。点击 **更多信息 → 仍要运行** 即可。
 
