@@ -112,7 +112,9 @@ export function PopupWindow() {
   const activeReqIdRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const capsuleRef = useRef<HTMLDivElement | null>(null);
-  const scrollEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const latestAssistantRef = useRef<HTMLDivElement | null>(null);
+  const userScrolledRef = useRef<boolean>(false);
   const lastHeightRef = useRef<number>(CAPSULE_COLLAPSED_H);
 
   const hasAttachments =
@@ -199,6 +201,7 @@ export function PopupWindow() {
       setAttachedImages([]);
       setNeedKeyNotice(false);
       setErrorMsg(null);
+      userScrolledRef.current = false;
       setMessages([userMsg, assistantMsg]);
       setIsStreaming(true);
       setStatusHint("正在解读选中内容...");
@@ -253,6 +256,7 @@ export function PopupWindow() {
     setStatusHint(null);
     setErrorMsg(null);
     setPinned(false);
+    userScrolledRef.current = false;
     lastHeightRef.current = CAPSULE_COLLAPSED_H;
   }, []);
 
@@ -424,11 +428,27 @@ export function PopupWindow() {
     showSuggestionsBar,
   ]);
 
+  // Keep the latest assistant answer's first line aligned to the top edge of the scroll viewport
+  // instead of forcing scroll to the bottom, and yield immediately whenever the user scrolls manually.
   useEffect(() => {
-    if (isStreaming) {
-      scrollEndRef.current?.scrollIntoView({ block: "end" });
+    if (!isStreaming || userScrolledRef.current) return;
+    const container = scrollContainerRef.current;
+    const target = latestAssistantRef.current;
+    if (!container || !target) return;
+
+    const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+    if (maxScroll <= 0) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const relativeTop = targetRect.top - containerRect.top + container.scrollTop;
+    const desiredTop = Math.max(0, Math.round(relativeTop - 12)); // 12px matches pt-3 top padding
+    const nextScrollTop = Math.min(desiredTop, maxScroll);
+
+    if (Math.abs(container.scrollTop - nextScrollTop) >= 1) {
+      container.scrollTop = nextScrollTop;
     }
-  }, [messages, isStreaming]);
+  }, [messages, isStreaming, statusHint]);
 
   const handleSend = async (overridePrompt?: string) => {
     if (isStreaming) return;
@@ -470,6 +490,7 @@ export function PopupWindow() {
     llmHistoryRef.current = nextLlm;
 
     setMessages([...messages, userMsg, assistantMsg]);
+    userScrolledRef.current = false;
     setInput("");
     setAttachedText(null);
     setShowTextPreview(false);
@@ -847,6 +868,16 @@ export function PopupWindow() {
           Boolean(statusHint) ||
           needKeyNotice) && (
           <div
+            ref={scrollContainerRef}
+            onWheel={() => {
+              userScrolledRef.current = true;
+            }}
+            onTouchMove={() => {
+              userScrolledRef.current = true;
+            }}
+            onPointerDown={() => {
+              userScrolledRef.current = true;
+            }}
             className={`glass-scroll max-h-[450px] overflow-y-auto border-t px-4 pb-4 pt-3 ${
               isDark ? "border-white/10" : "border-slate-900/8"
             }`}
@@ -875,14 +906,14 @@ export function PopupWindow() {
             )}
 
             <div className="space-y-3">
-              {messages.map((msg) =>
+              {messages.map((msg, idx) =>
                 msg.role === "user" ? (
                   <div key={msg.id} className="flex flex-col items-end gap-1.5">
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex flex-wrap justify-end gap-1.5">
-                        {msg.images.map((src, idx) => (
+                        {msg.images.map((src, imgIdx) => (
                           <img
-                            key={idx}
+                            key={imgIdx}
                             src={src}
                             alt=""
                             className="max-h-24 max-w-[180px] rounded-xl border border-white/15 object-cover"
@@ -901,7 +932,11 @@ export function PopupWindow() {
                     </div>
                   </div>
                 ) : (
-                  <div key={msg.id} className="group relative">
+                  <div
+                    key={msg.id}
+                    ref={idx === messages.length - 1 ? latestAssistantRef : null}
+                    className="group relative"
+                  >
                     {msg.content.trim() ? (
                       <>
                         <MarkdownView content={msg.content} isDark={isDark} />
@@ -970,7 +1005,6 @@ export function PopupWindow() {
                 </div>
               )}
             </div>
-            <div ref={scrollEndRef} />
           </div>
         )}
       </div>

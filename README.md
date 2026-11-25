@@ -52,7 +52,7 @@
 
 ### 直接安装（普通用户）
 
-前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载最新版安装包（如 `BTW-Float_1.1.0_x64-setup.exe`），双击安装即可，无需安装 Node.js 或 Rust。
+前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载最新版安装包（如 `BTW-Float_1.1.1_x64-setup.exe`），双击安装即可，无需安装 Node.js 或 Rust。
 
 > 安装包未做代码签名，Windows SmartScreen 可能提示「未知发布者」。点击 **更多信息 → 仍要运行** 即可。
 
