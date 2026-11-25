@@ -74,6 +74,10 @@ pnpm tauri dev
 
 ### 打包发布（NSIS 安装包）
 
+本项目已配置 [GitHub Actions 自动构建发布工作流](./.github/workflows/release.yml)：推送 `v*` 标签（如 `git tag v1.1.2 && git push origin v1.1.2`）或手动触发 workflow 后，CI 会在 `windows-latest` 上自动执行前端构建、Rust 单元测试、NSIS 打包，生成 `SHA256SUMS.txt` 与 **GitHub Build Provenance（SLSA）构建来源证明**，并自动上传至 GitHub Release。
+
+本地构建命令：
+
 ```powershell
 pnpm tauri build
 ```
@@ -141,6 +145,7 @@ BTW-Float/
 
 - **本地配置与加密**：配置文件仅保存在本机 `%APPDATA%\BTW-Float\config.json`，其中所有 API Key 均通过 Windows DPAPI（`CryptProtectData`）按当前 Windows 用户加密存储。
 - **直连接口**：所有问答请求均直接发往你配置的模型接口，无任何中转遥测或数据收集；对话内容仅保留在内存中，关闭胶囊即清空。
+- **构建可追溯与校验**：所有 Release 安装包均由 GitHub Actions 从公开源码自动构建，附带 `SHA256SUMS.txt` 与 GitHub Artifact Attestation（SLSA 构建证明）。下载后可执行 `gh attestation verify .\BTW-Float_*_x64-setup.exe -R Bugsoon/BTW-Float` 验证产物确由本仓库源码未经篡改地构建。
 
 ---
 

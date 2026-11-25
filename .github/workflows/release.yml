@@ -1,0 +1,193 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build & publish (e.g. v1.1.1; leave empty to use current version from tauri.conf.json)"
+        required: false
+        type: string
+      publish_release:
+        description: "Upload installer and SHA256SUMS.txt to GitHub Release"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-windows:
+    name: Build Windows x64 Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: meta
+        shell: pwsh
+        run: |
+          $tauriConf = Get-Content -Raw "src-tauri/tauri.conf.json" | ConvertFrom-Json
+          $pkgVersion = $tauriConf.version
+          if ("${{ github.event_name }}" -eq "push") {
+            $tag = "${{ github.ref_name }}"
+          } elseif ("${{ inputs.tag }}".Trim() -ne "") {
+            $tag = "${{ inputs.tag }}".Trim()
+          } else {
+            $tag = "v$pkgVersion"
+          }
+          $shouldPublish = if ("${{ github.event_name }}" -eq "push") { "true" } else { "${{ inputs.publish_release }}" }
+          Write-Output "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "version=$pkgVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "publish=$shouldPublish" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Target tag: $tag | tauri.conf.json version: $pkgVersion | publish: $shouldPublish"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - name: Install frontend dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify TypeScript & frontend build
+        shell: pwsh
+        run: pnpm build
+
+      - name: Run Rust unit tests
+        shell: pwsh
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build Tauri NSIS installer
+        shell: pwsh
+        run: pnpm tauri build --bundles nsis
+
+      - name: Generate SHA-256 checksums
+        id: checksum
+        shell: pwsh
+        run: |
+          $nsisDir = "src-tauri/target/release/bundle/nsis"
+          $installers = Get-ChildItem -Path $nsisDir -Filter "*.exe" | Sort-Object Name
+          if ($installers.Count -eq 0) {
+            throw "No NSIS installer found in $nsisDir"
+          }
+          $lines = @()
+          foreach ($file in $installers) {
+            $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            $lines += "$hash  $($file.Name)"
+            Write-Host "SHA256 ($($file.Name)): $hash"
+          }
+          $sumPath = Join-Path $nsisDir "SHA256SUMS.txt"
+          $content = ($lines -join "`n") + "`n"
+          [System.IO.File]::WriteAllText($sumPath, $content, [System.Text.UTF8Encoding]::new($false))
+
+          $primary = $installers[0]
+          $primaryHash = (Get-FileHash -Path $primary.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Output "installer_path=$($primary.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "installer_name=$($primary.Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "installer_sha256=$primaryHash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output "sums_path=$sumPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Generate GitHub Build Provenance Attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "src-tauri/target/release/bundle/nsis/*.exe"
+
+      - name: Upload workflow build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BTW-Float-windows-x64-${{ steps.meta.outputs.tag }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Create or update GitHub Release
+        if: steps.meta.outputs.publish == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $installerPath = "${{ steps.checksum.outputs.installer_path }}"
+          $installerName = "${{ steps.checksum.outputs.installer_name }}"
+          $installerSha = "${{ steps.checksum.outputs.installer_sha256 }}"
+          $sumsPath = "${{ steps.checksum.outputs.sums_path }}"
+          $repo = "${{ github.repository }}"
+          $runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          $verifyTemplate = @'
+
+          ### 构建可追溯与校验
+
+          本安装包由 [GitHub Actions](__RUN_URL__) 从公开源码自动构建，并附带 GitHub Build Provenance（SLSA）证明：
+
+          - **SHA-256**：`__SHA__`（见附件 `SHA256SUMS.txt`）
+          - **本地校验哈希**（PowerShell）：
+            ```powershell
+            (Get-FileHash ".\__FILE__" -Algorithm SHA256).Hash.ToLower()
+            ```
+          - **验证 GitHub 构建来源**（需安装 [GitHub CLI](https://cli.github.com/)）：
+            ```powershell
+            gh attestation verify ".\__FILE__" -R __REPO__
+            ```
+          '@
+          $verifySection = $verifyTemplate.
+            Replace("__RUN_URL__", $runUrl).
+            Replace("__SHA__", $installerSha).
+            Replace("__FILE__", $installerName).
+            Replace("__REPO__", $repo)
+
+          $notesFile = "docs/RELEASE_NOTES_$tag.md"
+          $finalNotesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
+          if (Test-Path $notesFile) {
+            $baseNotes = Get-Content -Raw $notesFile
+            [System.IO.File]::WriteAllText($finalNotesPath, $baseNotes.TrimEnd() + "`n" + $verifySection, [System.Text.UTF8Encoding]::new($false))
+          } else {
+            [System.IO.File]::WriteAllText($finalNotesPath, "## BTW-Float $tag`n" + $verifySection, [System.Text.UTF8Encoding]::new($false))
+          }
+
+          $releaseExists = $false
+          try {
+            gh release view $tag --repo $repo *> $null
+            if ($LASTEXITCODE -eq 0) { $releaseExists = $true }
+          } catch {
+            $releaseExists = $false
+          }
+
+          if ($releaseExists) {
+            gh release upload $tag $installerPath $sumsPath --clobber --repo $repo
+            gh release edit $tag --notes-file $finalNotesPath --repo $repo
+          } else {
+            if (Test-Path $notesFile) {
+              gh release create $tag $installerPath $sumsPath --title "BTW-Float $tag" --notes-file $finalNotesPath --latest --repo $repo
+            } else {
+              gh release create $tag $installerPath $sumsPath --title "BTW-Float $tag" --generate-notes --notes-file $finalNotesPath --latest --repo $repo
+            }
+          }
