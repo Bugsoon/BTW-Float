@@ -1,17 +1,17 @@
-name: Release
+name: Release (WorkBuddy Edition)
 
 on:
   push:
     tags:
-      - "v*"
+      - "v*-wb*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build & publish (e.g. v1.1.1; leave empty to use current version from tauri.conf.json)"
+        description: "Pre-release tag to build & publish (e.g. v1.2.0-wb.1; leave empty to use v<version>-wb.1)"
         required: false
         type: string
       publish_release:
-        description: "Upload installer and SHA256SUMS.txt to GitHub Release"
+        description: "Upload installer and SHA256SUMS.txt to GitHub Pre-release"
         required: false
         default: true
         type: boolean
@@ -45,7 +45,7 @@ jobs:
           } elseif ("${{ inputs.tag }}".Trim() -ne "") {
             $tag = "${{ inputs.tag }}".Trim()
           } else {
-            $tag = "v$pkgVersion"
+            $tag = "v$pkgVersion-wb.1"
           }
           $shouldPublish = if ("${{ github.event_name }}" -eq "push") { "true" } else { "${{ inputs.publish_release }}" }
           Write-Output "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
@@ -97,6 +97,18 @@ jobs:
           if ($installers.Count -eq 0) {
             throw "No NSIS installer found in $nsisDir"
           }
+
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $ver = $tag.TrimStart("v")
+          $primary = $installers[0]
+          $targetName = "BTW-Float_${ver}_x64-setup.exe"
+          if ($primary.Name -ne $targetName) {
+            $targetPath = Join-Path $nsisDir $targetName
+            Move-Item -Path $primary.FullName -Destination $targetPath -Force
+            $installers = Get-ChildItem -Path $nsisDir -Filter "*.exe" | Sort-Object Name
+            $primary = Get-Item -Path $targetPath
+          }
+
           $lines = @()
           foreach ($file in $installers) {
             $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -107,7 +119,6 @@ jobs:
           $content = ($lines -join "`n") + "`n"
           [System.IO.File]::WriteAllText($sumPath, $content, [System.Text.UTF8Encoding]::new($false))
 
-          $primary = $installers[0]
           $primaryHash = (Get-FileHash -Path $primary.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           Write-Output "installer_path=$($primary.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Output "installer_name=$($primary.Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
@@ -128,7 +139,7 @@ jobs:
             src-tauri/target/release/bundle/nsis/SHA256SUMS.txt
           if-no-files-found: error
 
-      - name: Create or update GitHub Release
+      - name: Create or update GitHub Pre-release
         if: steps.meta.outputs.publish == 'true'
         shell: pwsh
         env:
@@ -146,7 +157,7 @@ jobs:
 
           ### 构建可追溯与校验
 
-          本安装包由 [GitHub Actions](__RUN_URL__) 从公开源码自动构建，并附带 GitHub Build Provenance（SLSA）证明：
+          本安装包由 [GitHub Actions](__RUN_URL__) 从 `feat/workbuddy2api-core` 分支公开源码自动构建，作为独立 **Pre-release** 发布（不影响 `main` 主线与 Scoop 正式版），并附带 GitHub Build Provenance（SLSA）证明：
 
           - **SHA-256**：`__SHA__`（见附件 `SHA256SUMS.txt`）
           - **本地校验哈希**（PowerShell）：
@@ -170,7 +181,7 @@ jobs:
             $baseNotes = Get-Content -Raw $notesFile
             [System.IO.File]::WriteAllText($finalNotesPath, $baseNotes.TrimEnd() + "`n" + $verifySection, [System.Text.UTF8Encoding]::new($false))
           } else {
-            [System.IO.File]::WriteAllText($finalNotesPath, "## BTW-Float $tag`n" + $verifySection, [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::WriteAllText($finalNotesPath, "## BTW-Float $tag (WorkBuddy 内置版)`n" + $verifySection, [System.Text.UTF8Encoding]::new($false))
           }
 
           $releaseExists = $false
@@ -183,49 +194,11 @@ jobs:
 
           if ($releaseExists) {
             gh release upload $tag $installerPath $sumsPath --clobber --repo $repo
-            gh release edit $tag --notes-file $finalNotesPath --repo $repo
+            gh release edit $tag --prerelease --notes-file $finalNotesPath --repo $repo
           } else {
             if (Test-Path $notesFile) {
-              gh release create $tag $installerPath $sumsPath --title "BTW-Float $tag" --notes-file $finalNotesPath --latest --repo $repo
+              gh release create $tag $installerPath $sumsPath --target "${{ github.sha }}" --title "BTW-Float $tag (WorkBuddy 内置版)" --notes-file $finalNotesPath --prerelease --repo $repo
             } else {
-              gh release create $tag $installerPath $sumsPath --title "BTW-Float $tag" --generate-notes --notes-file $finalNotesPath --latest --repo $repo
+              gh release create $tag $installerPath $sumsPath --target "${{ github.sha }}" --title "BTW-Float $tag (WorkBuddy 内置版)" --generate-notes --notes-file $finalNotesPath --prerelease --repo $repo
             }
           }
-
-      - name: Update Scoop bucket manifest on main
-        if: steps.meta.outputs.publish == 'true'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $tag = "${{ steps.meta.outputs.tag }}"
-          $ver = $tag.TrimStart("v")
-          $installerName = "${{ steps.checksum.outputs.installer_name }}"
-          $installerSha = "${{ steps.checksum.outputs.installer_sha256 }}"
-          $bucketFile = "bucket/btw-float.json"
-
-          git fetch origin main
-          git checkout -B main origin/main
-          if (-not (Test-Path $bucketFile)) {
-            Write-Host "No Scoop manifest found at $bucketFile, skipping."
-            exit 0
-          }
-
-          $manifest = Get-Content -Raw $bucketFile | ConvertFrom-Json
-          $newUrl = "https://github.com/${{ github.repository }}/releases/download/$tag/$installerName#/dl.7z"
-          if ($manifest.version -eq $ver -and $manifest.architecture.'64bit'.hash -eq $installerSha) {
-            Write-Host "Scoop manifest already up to date for $ver."
-            exit 0
-          }
-
-          $manifest.version = $ver
-          $manifest.architecture.'64bit'.url = $newUrl
-          $manifest.architecture.'64bit'.hash = $installerSha
-          $json = ($manifest | ConvertTo-Json -Depth 10) + "`n"
-          [System.IO.File]::WriteAllText((Resolve-Path $bucketFile), $json, [System.Text.UTF8Encoding]::new($false))
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add $bucketFile
-          git commit -m "chore(scoop): bump btw-float to $ver [skip ci]"
-          git push origin main

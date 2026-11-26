@@ -1,6 +1,6 @@
 [package]
 name = "btw-float"
-version = "1.1.1"
+version = "1.2.0"
 description = "BTW-Float - Windows 11 Liquid Glass AI Floating Assistant"
 authors = ["Bugsoon"]
 edition = "2021"

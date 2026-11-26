@@ -5,6 +5,8 @@
 ![Tauri v2](https://img.shields.io/badge/Tauri-v2-24C8DB.svg)
 
 > 面向 Windows 11 的轻量 `/btw` 风格桌面 AI 悬浮球助手。随手呼出、问完即走、关闭自动清空。
+>
+> **当前分支说明（`feat/workbuddy2api-core`）**：本分支为 **WorkBuddy 内置版**，在保留全部原有 BYOK 能力的基础上，内嵌了纯 Rust 极简 WorkBuddy 内核，与 `main` 主线（纯 BYOK 版）独立并行发布。
 
 https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
 
@@ -26,10 +28,14 @@ https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
   - `Alt + A`：全屏冻结框选任意区域提问（高分屏 DPI 精确裁剪）。
   - `Alt + S`：一键截取当前活动窗口提问。
   - 截屏前自动隐藏自身窗口，避免把悬浮球拍进截图。
-- **BYOK 多模型 & 自动扫描**
-  - 兼容所有 OpenAI Chat Completions 协议接口（DeepSeek、OpenRouter、硅基流动、各类中转站、本地 Ollama 等）。
+- **内置轻量 WorkBuddy 内核（零配置开箱即用）**
+  - 纯 Rust 内嵌单账号 WorkBuddy 协议转换核心，仅在本机回环地址 `127.0.0.1:18080` 提供标准 OpenAI 兼容接口（`/v1/models`、`/v1/chat/completions`），无需额外运行代理服务。
+  - 在设置页 **WorkBuddy 内核** 中可直接通过官方 OAuth 登录国内版（`workbuddy.cn`）或国际版（`codebuddy.ai` / `workbuddy.ai`），自动同步模型列表（默认优先选用 `DeepSeek-V4.1-Flash`），按需查看账号状态与剩余积分。
+  - 国内版个人账号内置**拟人每日自动签到**（默认开启，每天在 `08:15–10:45` CST 随机窗口自然触发，支持晚开机补签，不整点准时请求）。
+- **BYOK 多模型 & 一键切换**
+  - 兼容所有 OpenAI Chat Completions 协议接口（DeepSeek、OpenRouter、硅基流动、各类中转站、本地 Ollama 等），支持在 **设置 → 模型与 API** 顶部直接切换当前对话使用的模型。
   - 填写 Base URL 与 API Key 后自动扫描 `/models`（兼容 `/v1/models` 与 Ollama `/api/tags`），支持搜索勾选模型并自动识别识图能力。
-  - API Key 使用 **Windows DPAPI** 在本机加密存储（`%APPDATA%\BTW-Float\config.json`），不上传任何云端服务。
+  - 所有 API Key 与 WorkBuddy OAuth 令牌均使用 **Windows DPAPI** 在本机加密存储（`%APPDATA%\BTW-Float\config.json`），不上传任何云端服务。
 - **免费 Agent 联网搜索 & 纯净输出**
   - 无需第三方搜索 API Key，内置 Bing + DuckDuckGo HTML 自动兜底检索与网页正文读取，自动识别 Windows 系统代理。
   - 实时剥离模型思考过程（`reasoning_content`、`<think>`、`<thought>`），只展示最终答案；参考网站来源默认隐藏，可在设置中自由开关。
@@ -54,18 +60,10 @@ https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
 
 ### 直接安装（普通用户）
 
-- **安装包直装**：前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载最新版安装包（如 `BTW-Float_1.1.1_x64-setup.exe`），双击安装即可，无需安装 Node.js 或 Rust。
-- **通过 Scoop 安装**：
-  ```powershell
-  scoop bucket add btw-float https://github.com/Bugsoon/BTW-Float
-  scoop install btw-float/btw-float
-  ```
-- **通过 Winget 安装**（等待 `microsoft/winget-pkgs` PR 合入后可用）：
-  ```powershell
-  winget install Bugsoon.BTW-Float
-  ```
+- **安装包直装（Releases）**：前往 **[GitHub Releases](https://github.com/Bugsoon/BTW-Float/releases)**，找到带 `Pre-release` 标记且版本号含 `-wb` 后缀的 **WorkBuddy 内置版**（如 `v1.2.0-wb.1`），下载对应安装包（如 `BTW-Float_1.2.0-wb.1_x64-setup.exe`）双击安装即可，无需安装 Node.js 或 Rust。
 
 > 安装包未做代码签名，Windows SmartScreen 可能提示「未知发布者」。点击 **更多信息 → 仍要运行** 即可。
+> 如需纯 BYOK 主线版（支持 Scoop / Winget），请切换至 [`main`](https://github.com/Bugsoon/BTW-Float/tree/main) 分支。
 
 ### 环境要求
 
@@ -85,7 +83,7 @@ pnpm tauri dev
 
 ### 打包发布（NSIS 安装包）
 
-本项目已配置 [GitHub Actions 自动构建发布工作流](./.github/workflows/release.yml)：推送 `v*` 标签（如 `git tag v1.1.2 && git push origin v1.1.2`）或手动触发 workflow 后，CI 会在 `windows-latest` 上自动执行前端构建、Rust 单元测试、NSIS 打包，生成 `SHA256SUMS.txt` 与 **GitHub Build Provenance（SLSA）构建来源证明**，并自动上传至 GitHub Release。
+本分支的 [GitHub Actions 自动构建发布工作流](./.github/workflows/release.yml) 已隔离为 **Pre-release** 模式：推送 `v*-wb*` 标签（如 `git tag v1.2.0-wb.1 && git push origin v1.2.0-wb.1`）或在 Actions 页面手动选择本分支触发 workflow 后，CI 会在 `windows-latest` 上自动执行前端构建、Rust 单元测试、NSIS 打包，生成 `SHA256SUMS.txt` 与 **GitHub Build Provenance（SLSA）构建来源证明**，并发布为 GitHub **Pre-release**（不会覆盖 `main` 的 Latest Release 或 Scoop 清单）。
 
 本地构建命令：
 
@@ -123,10 +121,11 @@ BTW-Float/
 │   │   ├── BallWindow.tsx     # 桌面悬浮球窗口
 │   │   ├── PopupWindow.tsx    # 极简胶囊问答窗口
 │   │   ├── CaptureWindow.tsx  # 区域框选截屏窗口
-│   │   └── SettingsWindow.tsx # 设置窗口（模型 / 快捷键与侧键 / 悬浮球与交互）
+│   │   └── SettingsWindow.tsx # 设置窗口（模型与 API / WorkBuddy 内核 / 快捷键与侧键 / 悬浮球与交互）
 │   ├── components/
 │   │   ├── MarkdownView.tsx   # Markdown 渲染与代码块一键复制
-│   │   └── SourceList.tsx     # 可选联网参考来源展示
+│   │   ├── SourceList.tsx     # 可选联网参考来源展示
+│   │   └── WorkBuddyPanel.tsx # 内置 WorkBuddy 单账号登录、状态/积分展示与拟人签到面板
 │   ├── lib/
 │   │   ├── commands.ts        # Tauri IPC 命令封装
 │   │   ├── suggestions.ts     # 0ms 本地联想词、划词 Prompt 与图片压缩
@@ -147,22 +146,30 @@ BTW-Float/
         ├── llm.rs             # OpenAI 流式 SSE、思考过滤、Agent 工具循环与模型扫描
         ├── search.rs          # 零 Key 免费联网搜索（Bing + DuckDuckGo）与正文提取
         ├── hotkey.rs          # 全局快捷键注册与分发
-        └── tray.rs            # 系统托盘与悬浮球右键菜单
+        ├── tray.rs            # 系统托盘与悬浮球右键菜单
+        └── workbuddy/         # 纯 Rust 极简 WorkBuddy2API 内核
+            ├── mod.rs         # 单账号生命周期、令牌刷新、拟人自动签到与状态缓存
+            ├── site.rs        # 国内/国际站点端点、真机指纹与官方 ID 生成
+            ├── protocol.rs    # 请求头构造、协议兼容转换、gzip 压缩与错误分类
+            ├── auth.rs        # 官方 OAuth 设备授权登录流程
+            ├── client.rs      # HTTP/1.1 上游通信、模型同步、每日签到与按需积分查询
+            └── server.rs      # 仅监听 127.0.0.1 的轻量 axum OpenAI 兼容网关
 ```
 
 ---
 
 ## 隐私与安全
 
-- **本地配置与加密**：配置文件仅保存在本机 `%APPDATA%\BTW-Float\config.json`，其中所有 API Key 均通过 Windows DPAPI（`CryptProtectData`）按当前 Windows 用户加密存储。
-- **直连接口**：所有问答请求均直接发往你配置的模型接口，无任何中转遥测或数据收集；对话内容仅保留在内存中，关闭胶囊即清空。
+- **本地配置与加密**：配置文件仅保存在本机 `%APPDATA%\BTW-Float\config.json`，其中所有 API Key、WorkBuddy OAuth 令牌及网关密钥均通过 Windows DPAPI（`CryptProtectData`）按当前 Windows 用户加密存储，且不会以明文返回给前端。
+- **本地回环与直连**：内置 WorkBuddy 网关强制仅绑定 `127.0.0.1`，不向局域网暴露；所有问答请求均直接发往你配置的模型接口或官方 WorkBuddy 服务端，无任何第三方遥测或数据收集；对话内容仅保留在内存中，关闭胶囊即清空。
 - **构建可追溯与校验**：所有 Release 安装包均由 GitHub Actions 从公开源码自动构建，附带 `SHA256SUMS.txt` 与 GitHub Artifact Attestation（SLSA 构建证明）。下载后可执行 `gh attestation verify .\BTW-Float_*_x64-setup.exe -R Bugsoon/BTW-Float` 验证产物确由本仓库源码未经篡改地构建。
 
 ---
 
-## 更多文档
+## 致谢与文档
 
 - 架构设计与技术细节请参阅 [docs/SPEC.md](./docs/SPEC.md)。
+- 内置 WorkBuddy 协议转换与站点适配参考了 [misakano7545/workbuddy2api-panel](https://github.com/misakano7545/workbuddy2api-panel)（MIT License），在此致谢。
 
 ---
 
