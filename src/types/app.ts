@@ -45,6 +45,59 @@ export interface UiConfig {
   quickPrompts: string[];
 }
 
+export interface WorkBuddyAccountView {
+  uid: string;
+  nickname: string;
+  realm: string;
+  site: string;
+  domain: string;
+  expiresAt: number;
+  status: "ready" | "no_credit" | "rate_limited" | "session_dead" | string;
+  lastError: string | null;
+  checkedInToday: boolean;
+  lastCheckinDate: string;
+  lastCheckinMsg: string | null;
+  nextCheckinHint: string | null;
+  creditsRemain: number | null;
+  creditsTotal: number | null;
+  creditsUnlimited: boolean;
+}
+
+export interface WorkBuddyStatus {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  baseUrl: string;
+  hasApiKey: boolean;
+  autoCheckin: boolean;
+  lastError: string | null;
+  account: WorkBuddyAccountView | null;
+  cachedModelCount: number;
+}
+
+export interface WorkBuddyCheckinReceipt {
+  uid: string;
+  state: "checked" | "already" | "pending" | "skipped" | "failed" | string;
+  credit: number | null;
+  streakDays: number | null;
+  message: string;
+}
+
+export interface WorkBuddyLoginStart {
+  state: string;
+  authUrl: string;
+  site: string;
+  realm: string;
+}
+
+export interface WorkBuddyLoginPoll {
+  status: "pending" | "done" | "fatal" | "expired" | string;
+  message: string | null;
+  uid: string | null;
+  nickname: string | null;
+  realm: string | null;
+}
+
 export interface AppConfig {
   providers: ProviderConfig[];
   activeProviderId: string;

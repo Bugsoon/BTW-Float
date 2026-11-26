@@ -9,25 +9,41 @@ mod selection;
 mod tray;
 mod win_native;
 mod window_mgr;
+mod workbuddy;
 
-use config::{load_config, save_config, AppConfig};
+use config::{load_config, save_config, AppConfig, ModelConfig};
 use hotkey::HotkeyBindResult;
 use llm::{ChatStreamRequest, FetchModelsResponse};
 use mouse_hook::MouseHookEvent;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_opener::OpenerExt;
 use window_mgr::{AppState, PopupPrefillPayload};
+use workbuddy::auth::{LoginPollResult, LoginStartResponse};
+use workbuddy::client::CheckinReceipt;
+use workbuddy::WorkBuddyStatusPayload;
+
+fn redact_workbuddy_secrets(mut cfg: AppConfig) -> AppConfig {
+    cfg.workbuddy.account = None;
+    cfg.workbuddy.accounts.clear();
+    cfg
+}
 
 #[tauri::command]
 fn get_config(state: State<'_, AppState>) -> AppConfig {
-    state.config.lock().clone()
+    redact_workbuddy_secrets(state.config.lock().clone())
 }
 
 #[tauri::command]
 fn save_app_config(
     app: AppHandle,
     state: State<'_, AppState>,
-    new_config: AppConfig,
+    mut new_config: AppConfig,
 ) -> Result<Vec<HotkeyBindResult>, String> {
+    // Preserve kernel-owned WorkBuddy accounts & settings (managed by wb_* commands)
+    {
+        let guard = state.config.lock();
+        new_config.workbuddy = guard.workbuddy.clone();
+    }
     save_config(&new_config)?;
     win_native::apply_autostart(new_config.ui.autostart);
     let show_ball = new_config.ui.show_ball;
@@ -47,7 +63,7 @@ fn save_app_config(
     window_mgr::refresh_app_suppression(&app);
 
     let bind_results = hotkey::apply_all_hotkeys(&app, &new_config);
-    let _ = app.emit("config:updated", &new_config);
+    let _ = app.emit("config:updated", &redact_workbuddy_secrets(new_config));
     Ok(bind_results)
 }
 
@@ -63,7 +79,7 @@ fn set_active_model(
         guard.active_provider_id = provider_id;
         guard.active_model_id = model_id;
         save_config(&guard)?;
-        guard.clone()
+        redact_workbuddy_secrets(guard.clone())
     };
     let _ = app.emit("config:updated", &updated);
     Ok(())
@@ -79,7 +95,7 @@ fn set_default_web_search(
         let mut guard = state.config.lock();
         guard.ui.default_web_search = enabled;
         save_config(&guard)?;
-        guard.clone()
+        redact_workbuddy_secrets(guard.clone())
     };
     let _ = app.emit("config:updated", &updated);
     Ok(())
@@ -195,6 +211,82 @@ fn abort_chat_stream(state: State<'_, AppState>, request_id: String) {
     state.streams.abort(&request_id);
 }
 
+#[tauri::command]
+fn wb_get_status(state: State<'_, AppState>) -> WorkBuddyStatusPayload {
+    state.workbuddy.status()
+}
+
+#[tauri::command]
+async fn wb_apply_settings(
+    state: State<'_, AppState>,
+    enabled: bool,
+    port: u16,
+    api_key: String,
+) -> Result<WorkBuddyStatusPayload, String> {
+    state.workbuddy.apply_settings(enabled, port, api_key).await
+}
+
+#[tauri::command]
+async fn wb_login_start(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    site: String,
+) -> Result<LoginStartResponse, String> {
+    let res = state.workbuddy.start_login(&site).await?;
+    let _ = app.opener().open_url(&res.auth_url, None::<&str>);
+    Ok(res)
+}
+
+#[tauri::command]
+async fn wb_login_poll(
+    state: State<'_, AppState>,
+    login_state: String,
+) -> Result<LoginPollResult, String> {
+    state.workbuddy.poll_login(&login_state).await
+}
+
+#[tauri::command]
+fn wb_login_cancel(state: State<'_, AppState>, login_state: String) {
+    state.workbuddy.cancel_login(&login_state);
+}
+
+#[tauri::command]
+fn wb_logout(state: State<'_, AppState>) -> Result<WorkBuddyStatusPayload, String> {
+    state.workbuddy.logout()
+}
+
+#[tauri::command]
+async fn wb_refresh_token(state: State<'_, AppState>) -> Result<WorkBuddyStatusPayload, String> {
+    let _ = state.workbuddy.ensure_fresh_account(true).await?;
+    Ok(state.workbuddy.status())
+}
+
+#[tauri::command]
+async fn wb_refresh_status(state: State<'_, AppState>) -> Result<WorkBuddyStatusPayload, String> {
+    state.workbuddy.refresh_account_status().await
+}
+
+#[tauri::command]
+async fn wb_sync_models(
+    state: State<'_, AppState>,
+    set_as_default: bool,
+) -> Result<Vec<ModelConfig>, String> {
+    state.workbuddy.sync_models_to_provider(set_as_default).await
+}
+
+#[tauri::command]
+fn wb_set_auto_checkin(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<WorkBuddyStatusPayload, String> {
+    state.workbuddy.set_auto_checkin(enabled)
+}
+
+#[tauri::command]
+async fn wb_checkin_now(state: State<'_, AppState>) -> Result<CheckinReceipt, String> {
+    state.workbuddy.checkin_now().await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let initial_cfg = load_config();
@@ -209,6 +301,14 @@ pub fn run() {
         })
         .setup(move |app| {
             let handle = app.handle().clone();
+
+            // Attach AppHandle to embedded WorkBuddy2API kernel and start if enabled
+            let wb_kernel = handle.state::<AppState>().workbuddy.clone();
+            wb_kernel.attach_app(handle.clone());
+            wb_kernel.start_auto_checkin_loop();
+            tauri::async_runtime::spawn(async move {
+                let _ = wb_kernel.sync_server_lifecycle().await;
+            });
 
             tray::init_tray(&handle)?;
             window_mgr::init_windows(&handle);
@@ -265,6 +365,17 @@ pub fn run() {
             fetch_provider_models,
             start_chat_stream,
             abort_chat_stream,
+            wb_get_status,
+            wb_apply_settings,
+            wb_login_start,
+            wb_login_poll,
+            wb_login_cancel,
+            wb_logout,
+            wb_refresh_token,
+            wb_refresh_status,
+            wb_sync_models,
+            wb_set_auto_checkin,
+            wb_checkin_now,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BTW-Float");

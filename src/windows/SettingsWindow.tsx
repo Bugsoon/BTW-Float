@@ -11,17 +11,20 @@ import {
   RotateCcw,
   Save,
   Search,
+  Server,
   ShieldCheck,
   Sliders,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
+import { WorkBuddyPanel } from "../components/WorkBuddyPanel";
 import {
   fetchProviderModels,
   getConfig,
   listRunningProcesses,
   saveAppConfig,
+  setActiveModel,
   setMouseRecording,
 } from "../lib/commands";
 import type {
@@ -31,7 +34,7 @@ import type {
   ProviderConfig,
 } from "../types/app";
 
-type TabId = "models" | "hotkeys" | "ui";
+type TabId = "models" | "workbuddy" | "hotkeys" | "ui";
 type HotkeyField =
   | "togglePopup"
   | "mouseToggle"
@@ -504,6 +507,26 @@ export function SettingsWindow() {
     }
   };
 
+  const handleSelectActiveModel = async (
+    providerId: string,
+    modelId: string,
+    modelLabel?: string
+  ) => {
+    if (!config || !modelId.trim()) return;
+    const next: AppConfig = {
+      ...config,
+      activeProviderId: providerId,
+      activeModelId: modelId,
+    };
+    setConfig(next);
+    try {
+      await setActiveModel(providerId, modelId);
+      showToast(`已切换当前模型：${modelLabel || modelId}`);
+    } catch (err) {
+      showToast(`切换模型失败: ${String(err)}`, 2800);
+    }
+  };
+
   const addProvider = (preset?: (typeof PROVIDER_PRESETS)[number]) => {
     if (!config) return;
     const id = `provider-${Date.now()}`;
@@ -814,6 +837,7 @@ export function SettingsWindow() {
         <nav className="w-44 shrink-0 space-y-1 border-r border-white/10 p-3">
           {[
             { id: "models" as const, label: "模型与 API", icon: Sparkles },
+            { id: "workbuddy" as const, label: "WorkBuddy 内核", icon: Server },
             {
               id: "hotkeys" as const,
               label: "快捷键与侧键",
@@ -845,6 +869,49 @@ export function SettingsWindow() {
         <div className="glass-scroll min-w-0 flex-1 overflow-y-auto p-6">
           {tab === "models" && (
             <div className="space-y-5">
+              {/* Prominent Active Model Selector */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-400/30 bg-sky-500/10 p-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-medium text-white">
+                    <Sparkles className="h-4 w-4 text-sky-300" />
+                    <span>当前对话使用的模型</span>
+                  </div>
+                  <p className="mt-0.5 text-[11.5px] text-slate-300/80">
+                    悬浮球提问、划词解答和截屏提问默认使用这里选中的模型（点选即刻生效）
+                  </p>
+                </div>
+                <select
+                  value={`${config.activeProviderId}::${config.activeModelId}`}
+                  onChange={(e) => {
+                    const [pid, ...rest] = e.target.value.split("::");
+                    const mid = rest.join("::");
+                    const prov = config.providers.find((p) => p.id === pid);
+                    const mod = prov?.models.find((m) => m.id === mid);
+                    void handleSelectActiveModel(pid, mid, mod?.label || mid);
+                  }}
+                  className="min-w-[230px] max-w-full rounded-xl border border-sky-400/40 bg-[#0b101b] px-3 py-2 text-xs font-medium text-white outline-none focus:border-sky-300"
+                >
+                  {config.providers.map((p) => {
+                    const validModels = p.models.filter((m) => m.id.trim() !== "");
+                    if (validModels.length === 0) return null;
+                    return (
+                      <optgroup key={p.id} label={p.name || p.id}>
+                        {validModels.map((m) => (
+                          <option
+                            key={`${p.id}::${m.id}`}
+                            value={`${p.id}::${m.id}`}
+                          >
+                            {m.label && m.label !== m.id
+                              ? `${m.label} (${m.id})`
+                              : m.id}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </select>
+              </div>
+
               {/* Quick presets */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-slate-400">快速添加模板：</span>
@@ -1105,14 +1172,31 @@ export function SettingsWindow() {
                                         if (!added) {
                                           toggleScannedModel(provider.id, dm);
                                         }
-                                        setConfig((prev) =>
-                                          prev
-                                            ? {
-                                                ...prev,
-                                                activeProviderId: provider.id,
-                                                activeModelId: dm.id,
-                                              }
-                                            : prev
+                                        const nextProviders = config.providers.map(
+                                          (p) => {
+                                            if (p.id !== provider.id) return p;
+                                            if (
+                                              p.models.some((m) => m.id === dm.id)
+                                            ) {
+                                              return p;
+                                            }
+                                            const cleaned = p.models.filter(
+                                              (m) => m.id.trim() !== ""
+                                            );
+                                            return {
+                                              ...p,
+                                              models: [...cleaned, dm],
+                                            };
+                                          }
+                                        );
+                                        commitConfig(
+                                          {
+                                            ...config,
+                                            providers: nextProviders,
+                                            activeProviderId: provider.id,
+                                            activeModelId: dm.id,
+                                          },
+                                          `已切换当前模型：${dm.label || dm.id}`
                                         );
                                       }}
                                       className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] transition ${
@@ -1121,7 +1205,7 @@ export function SettingsWindow() {
                                           : "bg-white/8 text-slate-300 hover:bg-sky-500/25 hover:text-sky-100"
                                       }`}
                                     >
-                                      {isDefault ? "当前默认" : "直接选用"}
+                                      {isDefault ? "✓ 当前使用中" : "直接选用"}
                                     </button>
                                   </div>
                                 );
@@ -1148,7 +1232,11 @@ export function SettingsWindow() {
                       return (
                         <div
                           key={`${provider.id}-${idx}`}
-                          className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-2"
+                          className={`flex flex-wrap items-center gap-2 rounded-xl border p-2 transition ${
+                            isActive
+                              ? "border-sky-400/50 bg-sky-500/12"
+                              : "border-white/10 bg-black/20"
+                          }`}
                         >
                           <input
                             type="text"
@@ -1216,20 +1304,24 @@ export function SettingsWindow() {
                           </label>
                           <button
                             type="button"
+                            disabled={!m.id.trim()}
                             onClick={() =>
-                              setConfig({
-                                ...config,
-                                activeProviderId: provider.id,
-                                activeModelId: m.id,
-                              })
+                              commitConfig(
+                                {
+                                  ...config,
+                                  activeProviderId: provider.id,
+                                  activeModelId: m.id,
+                                },
+                                `已切换当前模型：${m.label || m.id}`
+                              )
                             }
-                            className={`rounded-md px-2 py-1 text-[11px] transition ${
+                            className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition disabled:opacity-40 ${
                               isActive
-                                ? "bg-sky-500/30 text-sky-200"
-                                : "bg-white/8 text-slate-300 hover:bg-white/15"
+                                ? "bg-sky-500/35 text-sky-100"
+                                : "bg-white/8 text-slate-300 hover:bg-sky-500/25 hover:text-white"
                             }`}
                           >
-                            {isActive ? "默认" : "设为默认"}
+                            {isActive ? "✓ 当前使用中" : "选用此模型"}
                           </button>
                           {provider.models.length > 1 && (
                             <button
@@ -1254,6 +1346,15 @@ export function SettingsWindow() {
                 </div>
               ))}
             </div>
+          )}
+
+          {tab === "workbuddy" && (
+            <WorkBuddyPanel
+              onToast={showToast}
+              onConfigChanged={() => {
+                void getConfig().then(setConfig);
+              }}
+            />
           )}
 
           {tab === "hotkeys" && (

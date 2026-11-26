@@ -72,6 +72,63 @@ pub struct UiConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct WorkBuddyAccount {
+    pub uid: String,
+    #[serde(default)]
+    pub nickname: String,
+    #[serde(default = "default_wb_realm")]
+    pub realm: String, // "cn" | "global"
+    #[serde(default = "default_wb_site")]
+    pub site: String, // "cn" | "intl" | "workbuddy"
+    #[serde(default)]
+    pub domain: String,
+    #[serde(default)]
+    pub enterprise_id: String,
+    #[serde(default)]
+    pub access_token: String,
+    #[serde(default)]
+    pub refresh_token: String,
+    #[serde(default)]
+    pub expires_at: i64,
+    #[serde(default)]
+    pub device_token: String,
+    #[serde(default)]
+    pub last_checkin_date: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkBuddyConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_wb_port")]
+    pub port: u16,
+    #[serde(default)]
+    pub api_key: String,
+    #[serde(default = "default_true")]
+    pub auto_checkin: bool,
+    #[serde(default)]
+    pub account: Option<WorkBuddyAccount>,
+    /// Legacy multi-account field kept read-only for seamless migration on load.
+    #[serde(default, skip_serializing)]
+    pub accounts: Vec<WorkBuddyAccount>,
+}
+
+impl Default for WorkBuddyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: default_wb_port(),
+            api_key: String::new(),
+            auto_checkin: true,
+            account: None,
+            accounts: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub providers: Vec<ProviderConfig>,
     pub active_provider_id: String,
@@ -81,6 +138,20 @@ pub struct AppConfig {
     pub mouse_priority: MousePriorityConfig,
     #[serde(default)]
     pub ui: UiConfig,
+    #[serde(default)]
+    pub workbuddy: WorkBuddyConfig,
+}
+
+fn default_wb_realm() -> String {
+    "cn".to_string()
+}
+
+fn default_wb_site() -> String {
+    "cn".to_string()
+}
+
+fn default_wb_port() -> u16 {
+    18080
 }
 
 fn default_true() -> bool {
@@ -168,6 +239,7 @@ impl Default for AppConfig {
             },
             mouse_priority: MousePriorityConfig::default(),
             ui: UiConfig::default(),
+            workbuddy: WorkBuddyConfig::default(),
         }
     }
 }
@@ -175,6 +247,22 @@ impl Default for AppConfig {
 pub fn config_path() -> PathBuf {
     let base = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
     base.join("BTW-Float").join("config.json")
+}
+
+fn decrypt_secret_field(field: &mut String) {
+    if let Some(enc) = field.strip_prefix("dpapi:") {
+        if let Ok(plain) = dpapi_decrypt(enc) {
+            *field = plain;
+        }
+    }
+}
+
+fn encrypt_secret_field(field: &mut String) {
+    if !field.is_empty() && !field.starts_with("dpapi:") {
+        if let Ok(enc) = dpapi_encrypt(field) {
+            *field = format!("dpapi:{enc}");
+        }
+    }
 }
 
 pub fn load_config() -> AppConfig {
@@ -186,11 +274,18 @@ pub fn load_config() -> AppConfig {
         return AppConfig::default();
     };
     for p in &mut cfg.providers {
-        if let Some(enc) = p.api_key.strip_prefix("dpapi:") {
-            if let Ok(plain) = dpapi_decrypt(enc) {
-                p.api_key = plain;
-            }
-        }
+        decrypt_secret_field(&mut p.api_key);
+    }
+    decrypt_secret_field(&mut cfg.workbuddy.api_key);
+    if cfg.workbuddy.account.is_none() && !cfg.workbuddy.accounts.is_empty() {
+        cfg.workbuddy.account = cfg.workbuddy.accounts.drain(..).next();
+    } else {
+        cfg.workbuddy.accounts.clear();
+    }
+    if let Some(acc) = cfg.workbuddy.account.as_mut() {
+        decrypt_secret_field(&mut acc.access_token);
+        decrypt_secret_field(&mut acc.refresh_token);
+        decrypt_secret_field(&mut acc.device_token);
     }
     cfg
 }
@@ -202,11 +297,14 @@ pub fn save_config(cfg: &AppConfig) -> Result<(), String> {
     }
     let mut disk_cfg = cfg.clone();
     for p in &mut disk_cfg.providers {
-        if !p.api_key.is_empty() && !p.api_key.starts_with("dpapi:") {
-            if let Ok(enc) = dpapi_encrypt(&p.api_key) {
-                p.api_key = format!("dpapi:{enc}");
-            }
-        }
+        encrypt_secret_field(&mut p.api_key);
+    }
+    encrypt_secret_field(&mut disk_cfg.workbuddy.api_key);
+    disk_cfg.workbuddy.accounts.clear();
+    if let Some(acc) = disk_cfg.workbuddy.account.as_mut() {
+        encrypt_secret_field(&mut acc.access_token);
+        encrypt_secret_field(&mut acc.refresh_token);
+        encrypt_secret_field(&mut acc.device_token);
     }
     let json = serde_json::to_string_pretty(&disk_cfg)
         .map_err(|e| format!("序列化配置失败: {e}"))?;

@@ -6,6 +6,7 @@ use crate::llm::StreamRegistry;
 use crate::selection;
 use crate::tray;
 use crate::win_native::{self, BallInputEvent};
+use crate::workbuddy::WorkBuddyKernel;
 use parking_lot::Mutex;
 use serde::Serialize;
 use std::path::Path;
@@ -75,6 +76,7 @@ pub struct BallDockState {
 pub struct AppState {
     pub config: Mutex<AppConfig>,
     pub streams: Arc<StreamRegistry>,
+    pub workbuddy: Arc<WorkBuddyKernel>,
     pub popup_open: AtomicBool,
     pub popup_pinned: AtomicBool,
     pub last_popup_shown: Mutex<Instant>,
@@ -87,9 +89,17 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: AppConfig) -> Self {
+        let workbuddy = Arc::new(WorkBuddyKernel::new(
+            config.workbuddy.enabled,
+            config.workbuddy.port,
+            config.workbuddy.api_key.clone(),
+            config.workbuddy.auto_checkin,
+            config.workbuddy.account.clone(),
+        ));
         Self {
             config: Mutex::new(config),
             streams: Arc::new(StreamRegistry::default()),
+            workbuddy,
             popup_open: AtomicBool::new(false),
             popup_pinned: AtomicBool::new(false),
             last_popup_shown: Mutex::new(Instant::now() - Duration::from_secs(10)),
