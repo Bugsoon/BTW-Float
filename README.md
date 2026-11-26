@@ -6,6 +6,9 @@
 
 > 面向 Windows 11 的轻量 `/btw` 风格桌面 AI 悬浮球助手。随手呼出、问完即走、关闭自动清空。
 
+> [!TIP]
+> **没有 API Key 也想零配置开箱即用？** 欢迎体验独立并行发布的 **[WorkBuddy 内置版（`feat/workbuddy2api-core` 分支）](https://github.com/Bugsoon/BTW-Float/tree/feat/workbuddy2api-core)**：保留全部 BYOK 能力，并内嵌纯 Rust 轻量 WorkBuddy 内核，支持国内/国际版官方 OAuth 登录、一键切换模型与拟人每日自动签到 → **[前往 Releases 下载 `-wb` 安装包](https://github.com/Bugsoon/BTW-Float/releases)**。
+
 https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
 
 基于 **Tauri v2 (Rust) + React 19 + TypeScript + Tailwind CSS v4** 构建，原生接入 Windows 11 Win32 API（低级鼠标钩子、UI Automation 划词读取、剪贴板监听、高分屏截屏与 DPAPI 本地加密）。
@@ -64,6 +67,7 @@ https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
   ```powershell
   winget install Bugsoon.BTW-Float
   ```
+- **WorkBuddy 内置版（零配置开箱即用）**：前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases)** 下载带 `Pre-release` 标记与 `-wb` 后缀的安装包（如 `BTW-Float_1.2.0-wb.1_x64-setup.exe`），详情见 [`feat/workbuddy2api-core`](https://github.com/Bugsoon/BTW-Float/tree/feat/workbuddy2api-core) 分支说明。
 
 > 安装包未做代码签名，Windows SmartScreen 可能提示「未知发布者」。点击 **更多信息 → 仍要运行** 即可。
 
