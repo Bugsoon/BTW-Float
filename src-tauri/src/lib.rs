@@ -11,22 +11,17 @@ mod win_native;
 mod window_mgr;
 mod workbuddy;
 
-use config::{load_config, save_config, AppConfig, ModelConfig};
+use config::{load_config, redact_workbuddy_secrets, save_config, AppConfig, ModelConfig};
 use hotkey::HotkeyBindResult;
 use llm::{ChatStreamRequest, FetchModelsResponse};
 use mouse_hook::MouseHookEvent;
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use window_mgr::{AppState, PopupPrefillPayload};
 use workbuddy::auth::{LoginPollResult, LoginStartResponse};
 use workbuddy::client::CheckinReceipt;
 use workbuddy::WorkBuddyStatusPayload;
-
-fn redact_workbuddy_secrets(mut cfg: AppConfig) -> AppConfig {
-    cfg.workbuddy.account = None;
-    cfg.workbuddy.accounts.clear();
-    cfg
-}
 
 #[tauri::command]
 fn get_config(state: State<'_, AppState>) -> AppConfig {
@@ -54,13 +49,14 @@ fn save_app_config(
 
     if let Some(ball) = app.get_webview_window("ball") {
         if show_ball && !window_mgr::is_suppressed_by_app(&app) {
+            window_mgr::apply_ball_edge_setting(&app);
             let _ = ball.show();
         } else {
             let _ = ball.hide();
         }
     }
-    window_mgr::apply_ball_edge_setting(&app);
     window_mgr::refresh_app_suppression(&app);
+    tray::sync_tray_state(&app);
 
     let bind_results = hotkey::apply_all_hotkeys(&app, &new_config);
     let _ = app.emit("config:updated", &redact_workbuddy_secrets(new_config));
@@ -289,10 +285,14 @@ async fn wb_checkin_now(state: State<'_, AppState>) -> Result<CheckinReceipt, St
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let Some(_single_instance_guard) = win_native::acquire_single_instance_or_wake() else {
+        return;
+    };
+
     let initial_cfg = load_config();
     let app_state = AppState::new(initial_cfg.clone());
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(app_state)
@@ -308,6 +308,19 @@ pub fn run() {
             wb_kernel.start_auto_checkin_loop();
             tauri::async_runtime::spawn(async move {
                 let _ = wb_kernel.sync_server_lifecycle().await;
+            });
+
+            if initial_cfg.ui.autostart {
+                win_native::apply_autostart(true);
+            }
+
+            let (wake_tx, mut wake_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+            win_native::start_single_instance_listener(wake_tx);
+            let wake_app = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                while wake_rx.recv().await.is_some() {
+                    window_mgr::wake_from_second_instance(&wake_app);
+                }
             });
 
             tray::init_tray(&handle)?;
@@ -338,6 +351,7 @@ pub fn run() {
 
             // Apply initial keyboard + mouse hotkeys
             let _ = hotkey::apply_all_hotkeys(&handle, &initial_cfg);
+            window_mgr::refresh_app_suppression(&handle);
 
             Ok(())
         })
@@ -377,6 +391,18 @@ pub fn run() {
             wb_set_auto_checkin,
             wb_checkin_now,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running BTW-Float");
+        .build(tauri::generate_context!())
+        .expect("error while building BTW-Float");
+
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { code, api, .. } = event {
+            let explicit = app_handle
+                .state::<AppState>()
+                .explicit_exit
+                .load(Ordering::SeqCst);
+            if code.is_none() && !explicit {
+                api.prevent_exit();
+            }
+        }
+    });
 }

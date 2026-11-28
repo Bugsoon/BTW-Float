@@ -1,6 +1,6 @@
 use crate::capture;
 use crate::clipboard_watch;
-use crate::config::{save_config, AppConfig};
+use crate::config::{redact_workbuddy_secrets, save_config, AppConfig};
 use crate::hotkey;
 use crate::llm::StreamRegistry;
 use crate::selection;
@@ -85,6 +85,7 @@ pub struct AppState {
     pub ball_dock: Mutex<BallDockState>,
     pub ball_anim_gen: AtomicU64,
     pub suppressed_by_app: AtomicBool,
+    pub explicit_exit: AtomicBool,
 }
 
 impl AppState {
@@ -108,7 +109,36 @@ impl AppState {
             ball_dock: Mutex::new(BallDockState::default()),
             ball_anim_gen: AtomicU64::new(0),
             suppressed_by_app: AtomicBool::new(false),
+            explicit_exit: AtomicBool::new(false),
         }
+    }
+}
+
+pub fn request_app_exit(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    state.explicit_exit.store(true, Ordering::SeqCst);
+    state.streams.abort_all();
+    app.exit(0);
+}
+
+pub fn wake_from_second_instance(app: &AppHandle) {
+    if is_suppressed_by_app(app) {
+        return;
+    }
+    let state = app.state::<AppState>();
+    if state.popup_open.load(Ordering::SeqCst) {
+        let app_for_main = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(p) = app_for_main.get_webview_window("popup") {
+                let _ = p.show();
+                if let Ok(hwnd) = p.hwnd() {
+                    win_native::show_and_focus_popup(hwnd.0 as isize);
+                }
+                let _ = p.set_focus();
+            }
+        });
+    } else {
+        open_popup_with_prefill(app, false, None);
     }
 }
 
@@ -148,7 +178,6 @@ pub fn init_windows(app: &AppHandle) {
             }
         };
         let _ = ball.set_position(Position::Physical(PhysicalPosition::new(bx, by)));
-        evaluate_and_apply_ball_dock(app, false, true);
 
         if let Ok(hwnd) = ball.hwnd() {
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<BallInputEvent>();
@@ -233,14 +262,34 @@ pub fn init_windows(app: &AppHandle) {
             });
         }
 
-        if cfg.ui.show_ball {
+        let ball_close_app = app.clone();
+        ball.on_window_event(move |event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let explicit = ball_close_app
+                    .state::<AppState>()
+                    .explicit_exit
+                    .load(Ordering::SeqCst);
+                if !explicit {
+                    api.prevent_close();
+                    if let Some(b) = ball_close_app.get_webview_window("ball") {
+                        let _ = b.hide();
+                    }
+                }
+            }
+        });
+
+        evaluate_and_apply_ball_dock(app, false, true);
+
+        let suppressed = is_foreground_process_disabled(app);
+        if cfg.ui.show_ball && !suppressed {
             let _ = ball.show();
-        } else {
-            let _ = ball.hide();
         }
     }
 
     if let Some(popup) = app.get_webview_window("popup") {
+        if let Ok(hwnd) = popup.hwnd() {
+            win_native::install_tool_window_style_lock(hwnd.0 as isize);
+        }
         let scale = popup.scale_factor().unwrap_or(1.0);
         let phys_w = (POPUP_WIN_LOGICAL_WIDTH * scale).round() as u32;
         let phys_h = (POPUP_WIN_INITIAL_HEIGHT * scale).round() as u32;
@@ -248,8 +297,18 @@ pub fn init_windows(app: &AppHandle) {
         let _ = popup.hide();
 
         let app_handle = app.clone();
-        popup.on_window_event(move |event| {
-            if let WindowEvent::Focused(false) = event {
+        popup.on_window_event(move |event| match event {
+            WindowEvent::CloseRequested { api, .. } => {
+                let explicit = app_handle
+                    .state::<AppState>()
+                    .explicit_exit
+                    .load(Ordering::SeqCst);
+                if !explicit {
+                    api.prevent_close();
+                    hide_popup_and_clear(&app_handle);
+                }
+            }
+            WindowEvent::Focused(false) => {
                 let state = app_handle.state::<AppState>();
                 if !state.popup_open.load(Ordering::SeqCst) {
                     return;
@@ -262,6 +321,7 @@ pub fn init_windows(app: &AppHandle) {
                     hide_popup_and_clear(&app_handle);
                 }
             }
+            _ => {}
         });
     }
 }
@@ -552,6 +612,9 @@ pub fn start_region_capture(app: &AppHandle) {
             let h_main = handle.clone();
             let _ = handle.run_on_main_thread(move || {
                 if let Some(cwin) = h_main.get_webview_window("capture") {
+                    if let Ok(hwnd) = cwin.hwnd() {
+                        win_native::install_tool_window_style_lock(hwnd.0 as isize);
+                    }
                     let _ = cwin.set_position(Position::Physical(PhysicalPosition::new(mx, my)));
                     let _ = cwin.set_size(Size::Physical(PhysicalSize::new(mw as u32, mh as u32)));
                     let _ = cwin.show();
@@ -682,20 +745,41 @@ fn handle_dropped_files(app: &AppHandle, files: Vec<String>) {
 
 pub fn toggle_ball_visibility(app: &AppHandle) -> bool {
     let state = app.state::<AppState>();
-    let mut cfg = state.config.lock();
-    cfg.ui.show_ball = !cfg.ui.show_ball;
-    let visible = cfg.ui.show_ball;
-    let _ = save_config(&cfg);
-    drop(cfg);
+    let (visible, updated_cfg) = {
+        let mut cfg = state.config.lock();
+        cfg.ui.show_ball = !cfg.ui.show_ball;
+        let visible = cfg.ui.show_ball;
+        let _ = save_config(&cfg);
+        (visible, redact_workbuddy_secrets(cfg.clone()))
+    };
 
     if let Some(ball) = app.get_webview_window("ball") {
         if visible && !state.suppressed_by_app.load(Ordering::SeqCst) {
+            evaluate_and_apply_ball_dock(app, false, false);
             let _ = ball.show();
         } else {
             let _ = ball.hide();
         }
     }
+    let _ = app.emit("config:updated", &updated_cfg);
+    tray::sync_tray_state(app);
     visible
+}
+
+pub fn toggle_autostart(app: &AppHandle) -> bool {
+    let state = app.state::<AppState>();
+    let (enabled, updated_cfg) = {
+        let mut cfg = state.config.lock();
+        cfg.ui.autostart = !cfg.ui.autostart;
+        let enabled = cfg.ui.autostart;
+        let _ = save_config(&cfg);
+        (enabled, redact_workbuddy_secrets(cfg.clone()))
+    };
+
+    win_native::apply_autostart(enabled);
+    let _ = app.emit("config:updated", &updated_cfg);
+    tray::sync_tray_state(app);
+    enabled
 }
 
 pub fn is_suppressed_by_app(app: &AppHandle) -> bool {
@@ -1076,6 +1160,7 @@ pub fn open_settings_window_async(app: &AppHandle) {
         .center()
         .decorations(true)
         .transparent(false)
+        .theme(Some(tauri::Theme::Light))
         .visible(true)
         .build()
         {

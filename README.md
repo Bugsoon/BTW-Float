@@ -121,15 +121,14 @@ BTW-Float/
 │   │   ├── BallWindow.tsx     # 桌面悬浮球窗口
 │   │   ├── PopupWindow.tsx    # 极简胶囊问答窗口
 │   │   ├── CaptureWindow.tsx  # 区域框选截屏窗口
-│   │   └── SettingsWindow.tsx # 设置窗口（模型与 API / WorkBuddy 内核 / 快捷键与侧键 / 悬浮球与交互）
+│   │   └── SettingsWindow.tsx # 设置窗口（模型与 API / WorkBuddy 内核 / 快捷键与侧键 / 后台与交互）
 │   ├── components/
 │   │   ├── MarkdownView.tsx   # Markdown 渲染与代码块一键复制
 │   │   ├── SourceList.tsx     # 可选联网参考来源展示
 │   │   └── WorkBuddyPanel.tsx # 内置 WorkBuddy 单账号登录、状态/积分展示与拟人签到面板
 │   ├── lib/
 │   │   ├── commands.ts        # Tauri IPC 命令封装
-│   │   ├── suggestions.ts     # 0ms 本地联想词、划词 Prompt 与图片压缩
-│   │   └── theme.ts           # 跟随系统浅色/深色主题
+│   │   └── suggestions.ts     # 0ms 本地联想词、划词 Prompt 与图片压缩
 │   └── types/app.ts           # 前后端共享类型定义
 └── src-tauri/                 # Rust + Win32 原生后端
     ├── Cargo.toml             # Rust 依赖与 Release 体积优化配置

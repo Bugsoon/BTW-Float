@@ -47,22 +47,22 @@ function accountStatusBadge(status: string) {
     case "session_dead":
       return {
         text: "需重登",
-        cls: "border-rose-400/30 bg-rose-500/20 text-rose-200",
+        cls: "border-rose-200 bg-rose-50 text-rose-700",
       };
     case "no_credit":
       return {
         text: "积分不足",
-        cls: "border-amber-400/35 bg-amber-500/20 text-amber-200",
+        cls: "border-amber-200 bg-amber-50 text-amber-700",
       };
     case "rate_limited":
       return {
         text: "限流中",
-        cls: "border-amber-400/35 bg-amber-500/20 text-amber-200",
+        cls: "border-amber-200 bg-amber-50 text-amber-700",
       };
     default:
       return {
         text: "正常可用",
-        cls: "border-emerald-400/30 bg-emerald-500/20 text-emerald-200",
+        cls: "border-emerald-200 bg-emerald-50 text-emerald-700",
       };
   }
 }
@@ -267,7 +267,7 @@ export function WorkBuddyPanel({
 
   if (!status) {
     return (
-      <div className="py-10 text-center text-xs text-slate-400">
+      <div className="py-10 text-center text-xs text-slate-500">
         正在加载 WorkBuddy 内核状态...
       </div>
     );
@@ -278,19 +278,19 @@ export function WorkBuddyPanel({
   return (
     <div className="space-y-5">
       {/* Section 1: Single Account Login & Status */}
-      <div className="space-y-3 rounded-2xl border border-white/12 bg-white/5 p-4">
+      <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <UserCheck className="h-4 w-4 text-sky-300" />
+            <UserCheck className="h-4 w-4 text-sky-600" />
             <div>
-              <div className="text-sm font-medium text-white">WorkBuddy 账号</div>
-              <p className="text-[11.5px] text-slate-400">
+              <div className="text-sm font-medium text-slate-900">WorkBuddy 账号</div>
+              <p className="text-[11.5px] text-slate-500">
                 单账号直连，OAuth 令牌经 Windows DPAPI 本地加密保存；模型请在「模型与 API」中切换
               </p>
             </div>
           </div>
           {status.cachedModelCount > 0 && (
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-slate-500">
               已同步 {status.cachedModelCount} 个模型
             </span>
           )}
@@ -306,16 +306,16 @@ export function WorkBuddyPanel({
               : `剩余积分 ${acc.creditsRemain.toLocaleString()}`
             : "积分待刷新";
           return (
-          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-white/10 bg-black/25 px-3.5 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/90 px-3.5 py-3">
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span
-                  className="truncate text-[13.5px] font-medium text-white"
+                  className="truncate text-[13.5px] font-medium text-slate-900"
                   title={`UID: ${acc.uid}`}
                 >
                   {acc.nickname || acc.uid}
                 </span>
-                <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] uppercase text-slate-300">
+                <span className="rounded bg-slate-200/80 px-1.5 py-0.5 font-mono text-[10px] uppercase text-slate-700">
                   {acc.realm}
                 </span>
                 <span
@@ -324,22 +324,22 @@ export function WorkBuddyPanel({
                   {badge.text}
                 </span>
                 {acc.realm === "cn" && acc.checkedInToday && (
-                  <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-200">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700">
                     今日已签
                   </span>
                 )}
                 {acc.realm === "cn" && !acc.checkedInToday && acc.nextCheckinHint && (
-                  <span className="rounded-full border border-sky-400/25 bg-sky-500/12 px-2 py-0.5 text-[10px] text-sky-200">
+                  <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] text-sky-700">
                     {acc.nextCheckinHint}
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                 <span
                   className={
                     acc.creditsRemain !== null && !acc.creditsUnlimited && acc.creditsRemain <= 0
-                      ? "font-medium text-amber-300"
-                      : "text-slate-200"
+                      ? "font-medium text-amber-600"
+                      : "text-slate-700"
                   }
                 >
                   {creditText}
@@ -349,13 +349,13 @@ export function WorkBuddyPanel({
                 {acc.lastCheckinMsg && (
                   <>
                     <span>·</span>
-                    <span className="text-emerald-200/90">{acc.lastCheckinMsg}</span>
+                    <span className="text-emerald-700">{acc.lastCheckinMsg}</span>
                   </>
                 )}
                 {acc.lastError && (
                   <>
                     <span>·</span>
-                    <span className="text-amber-300">最近错误: {acc.lastError}</span>
+                    <span className="text-amber-700">最近错误: {acc.lastError}</span>
                   </>
                 )}
               </div>
@@ -367,7 +367,7 @@ export function WorkBuddyPanel({
                 disabled={refreshingStatus}
                 onClick={() => void handleRefreshStatus()}
                 title="查询最新剩余积分与账号状态"
-                className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/6 px-2.5 py-1 text-[11px] text-slate-200 hover:bg-white/14 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
               >
                 <RefreshCw
                   className={`h-3 w-3 ${refreshingStatus ? "animate-spin" : ""}`}
@@ -377,7 +377,7 @@ export function WorkBuddyPanel({
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className="flex items-center gap-1 rounded-lg border border-rose-400/25 bg-rose-500/10 px-2.5 py-1 text-[11px] text-rose-200 hover:bg-rose-500/20"
+                className="flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] text-rose-700 transition hover:bg-rose-100"
               >
                 <LogOut className="h-3 w-3" />
                 <span>退出</span>
@@ -393,10 +393,10 @@ export function WorkBuddyPanel({
             value={site}
             onChange={(e) => setSite(e.target.value)}
             disabled={Boolean(loginSession)}
-            className="rounded-xl border border-white/12 bg-black/30 px-3 py-1.5 text-xs text-slate-100 outline-none focus:border-sky-400/60"
+            className="rounded-xl border border-slate-300/90 bg-white px-3 py-1.5 text-xs text-slate-900 outline-none focus:border-sky-400/60"
           >
             {SITE_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id} className="bg-[#0f131c]">
+              <option key={opt.id} value={opt.id}>
                 {opt.label}
               </option>
             ))}
@@ -422,7 +422,7 @@ export function WorkBuddyPanel({
             <button
               type="button"
               onClick={() => void handleCancelLogin()}
-              className="flex items-center gap-1 rounded-xl border border-rose-400/35 bg-rose-500/15 px-3 py-1.5 text-xs text-rose-200 hover:bg-rose-500/25"
+              className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs text-rose-700 transition hover:bg-rose-100"
             >
               <X className="h-3.5 w-3.5" />
               <span>取消等待</span>
@@ -431,8 +431,8 @@ export function WorkBuddyPanel({
         </div>
 
         {loginSession && (
-          <div className="space-y-2 rounded-xl border border-sky-400/30 bg-sky-500/10 p-3 text-xs">
-            <div className="flex items-center justify-between gap-2 text-sky-100">
+          <div className="space-y-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs">
+            <div className="flex items-center justify-between gap-2 text-sky-800">
               <span className="flex items-center gap-1.5">
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 {loginHint || "等待浏览器完成授权..."}
@@ -443,46 +443,46 @@ export function WorkBuddyPanel({
                   void navigator.clipboard.writeText(loginSession.authUrl);
                   onToast("已复制授权链接");
                 }}
-                className="flex items-center gap-1 rounded-md border border-sky-300/30 bg-sky-400/15 px-2 py-0.5 text-[11px] text-sky-100 hover:bg-sky-400/25"
+                className="flex items-center gap-1 rounded-md border border-sky-200 bg-white px-2 py-0.5 text-[11px] text-sky-700 transition hover:bg-sky-100"
               >
                 <ExternalLink className="h-3 w-3" />
                 <span>复制授权链接</span>
               </button>
             </div>
-            <div className="truncate font-mono text-[11px] text-slate-400 select-text">
+            <div className="truncate font-mono text-[11px] text-slate-500 select-text">
               {loginSession.authUrl}
             </div>
           </div>
         )}
 
         {!loginSession && loginHint && (
-          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             {loginHint}
           </div>
         )}
       </div>
 
       {/* Section 2: Kernel Gateway & Human-Like Daily Auto Check-in */}
-      <div className="space-y-3.5 rounded-2xl border border-white/12 bg-white/5 p-4">
+      <div className="space-y-3.5 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-400/15 text-emerald-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-600">
               <Server className="h-4 w-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2 text-sm font-medium text-white">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
                 <span>本地 OpenAI 兼容内核</span>
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[10.5px] ${
                     status.running
-                      ? "border-emerald-400/35 bg-emerald-500/20 text-emerald-200"
-                      : "border-white/15 bg-white/8 text-slate-400"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-slate-100 text-slate-500"
                   }`}
                 >
                   {status.running ? "运行中" : "已停止"}
                 </span>
               </div>
-              <p className="text-[11.5px] text-slate-400">
+              <p className="text-[11.5px] text-slate-500">
                 仅监听本机 127.0.0.1，供 BTW-Float 及本机其他工具调用
               </p>
             </div>
@@ -494,7 +494,7 @@ export function WorkBuddyPanel({
             onClick={() => void handleApplyGateway(!status.enabled)}
             className={`rounded-xl px-3.5 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
               status.enabled
-                ? "border border-rose-400/35 bg-rose-500/15 text-rose-200 hover:bg-rose-500/25"
+                ? "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
                 : "bg-emerald-500 text-white hover:bg-emerald-400"
             }`}
           >
@@ -502,10 +502,10 @@ export function WorkBuddyPanel({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/8 bg-black/25 px-3.5 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-slate-50/90 px-3.5 py-2">
           <div className="min-w-0 text-xs">
-            <span className="text-slate-400">本地 OpenAI 接口：</span>
-            <code className="ml-1 font-mono text-sky-200 select-text">
+            <span className="text-slate-500">本地 OpenAI 接口：</span>
+            <code className="ml-1 font-mono text-sky-700 select-text">
               {status.baseUrl}
             </code>
           </div>
@@ -513,11 +513,11 @@ export function WorkBuddyPanel({
             <button
               type="button"
               onClick={() => void handleCopyBaseUrl()}
-              className="flex items-center gap-1 rounded-lg border border-white/12 bg-white/8 px-2.5 py-1 text-[11px] text-slate-200 hover:bg-white/14"
+              className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-700 transition hover:bg-slate-100"
             >
               {copiedUrl ? (
                 <>
-                  <Check className="h-3 w-3 text-emerald-300" />
+                  <Check className="h-3 w-3 text-emerald-600" />
                   <span>已复制</span>
                 </>
               ) : (
@@ -531,7 +531,7 @@ export function WorkBuddyPanel({
               type="button"
               disabled={syncing || !acc}
               onClick={() => void handleSyncModels()}
-              className="flex items-center gap-1 rounded-lg border border-sky-400/35 bg-sky-500/15 px-2.5 py-1 text-[11px] text-sky-200 transition hover:bg-sky-500/25 disabled:opacity-45"
+              className="flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] text-sky-700 transition hover:bg-sky-100 disabled:opacity-45"
             >
               <RefreshCw className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
               <span>{syncing ? "刷新中..." : "刷新模型列表"}</span>
@@ -540,20 +540,20 @@ export function WorkBuddyPanel({
         </div>
 
         {status.lastError && (
-          <div className="rounded-xl border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-xs text-rose-200 select-text">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 select-text">
             {status.lastError}
           </div>
         )}
 
         {/* Daily Auto Check-in compact bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-slate-50/90 px-3.5 py-2">
           <div className="flex items-center gap-2">
-            <CalendarCheck2 className="h-4 w-4 text-emerald-300" />
+            <CalendarCheck2 className="h-4 w-4 text-emerald-600" />
             <div>
-              <div className="text-xs font-medium text-white">
+              <div className="text-xs font-medium text-slate-900">
                 每日自动签到（拟人策略 · 国内版个人号）
               </div>
-              <div className="text-[11px] text-slate-400">
+              <div className="text-[11px] text-slate-500">
                 每日 08:15–10:45 随机择时签到（绝不零点抢签）；晚开机则启动后随机延迟自动补签
               </div>
             </div>
@@ -563,7 +563,7 @@ export function WorkBuddyPanel({
               type="button"
               disabled={checkingIn || !acc || acc.realm !== "cn"}
               onClick={() => void handleCheckin()}
-              className="flex items-center gap-1 rounded-lg border border-emerald-400/35 bg-emerald-500/15 px-2.5 py-1 text-[11px] text-emerald-200 transition hover:bg-emerald-500/25 disabled:opacity-45"
+              className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-45"
             >
               <CalendarCheck2 className="h-3 w-3" />
               <span>{checkingIn ? "签到中..." : "立即签到"}</span>
@@ -574,7 +574,7 @@ export function WorkBuddyPanel({
               aria-checked={status.autoCheckin}
               onClick={() => void handleToggleAutoCheckin()}
               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-                status.autoCheckin ? "bg-emerald-500" : "bg-white/18 hover:bg-white/25"
+                status.autoCheckin ? "bg-emerald-500" : "bg-slate-300/90 hover:bg-slate-400/80"
               }`}
             >
               <span
@@ -589,7 +589,7 @@ export function WorkBuddyPanel({
         {/* Port & Optional Local API Key */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <label className="mb-1 block text-[11px] text-slate-400">
+            <label className="mb-1 block text-[11px] text-slate-500">
               监听端口（仅 127.0.0.1）
             </label>
             <input
@@ -598,16 +598,16 @@ export function WorkBuddyPanel({
               max={65535}
               value={portInput}
               onChange={(e) => setPortInput(e.target.value)}
-              className="w-full rounded-lg border border-white/12 bg-black/25 px-2.5 py-1.5 text-xs outline-none focus:border-sky-400/60 select-text"
+              className="w-full rounded-lg border border-slate-300/90 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-sky-400/60 select-text"
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-[11px] text-slate-400">
+            <label className="mb-1 block text-[11px] text-slate-500">
               本地访问 API Key（可选；留空表示本机免鉴权{status.hasApiKey ? "，当前已设置" : ""}）
             </label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <KeyRound className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                <KeyRound className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   value={apiKeyInput}
@@ -617,14 +617,14 @@ export function WorkBuddyPanel({
                       ? "输入新 Key 覆盖，或留空后点应用清除"
                       : "留空免 Key（推荐本机自用）"
                   }
-                  className="w-full rounded-lg border border-white/12 bg-black/25 py-1.5 pl-8 pr-2.5 text-xs outline-none focus:border-sky-400/60 select-text"
+                  className="w-full rounded-lg border border-slate-300/90 bg-white py-1.5 pl-8 pr-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-sky-400/60 select-text"
                 />
               </div>
               <button
                 type="button"
                 disabled={saving}
                 onClick={() => void handleApplyGateway()}
-                className="shrink-0 rounded-lg border border-white/14 bg-white/10 px-3 py-1.5 text-xs text-slate-100 hover:bg-white/18 disabled:opacity-50"
+                className="shrink-0 rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-200 disabled:opacity-50"
               >
                 应用端口/Key
               </button>

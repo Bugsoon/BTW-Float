@@ -29,7 +29,6 @@ import {
   compressImageFileToDataUrl,
   computeSmartSuggestions,
 } from "../lib/suggestions";
-import { useSystemDark } from "../lib/theme";
 import { MarkdownView } from "../components/MarkdownView";
 import { SourceList } from "../components/SourceList";
 import type {
@@ -88,7 +87,6 @@ function sourceLabel(source?: string | null): string {
 }
 
 export function PopupWindow() {
-  const isDark = useSystemDark();
   const [config, setConfig] = useState<AppConfig | null>(null);
 
   const [input, setInput] = useState("");
@@ -596,12 +594,8 @@ export function PopupWindow() {
 
   const canSend = Boolean(input.trim()) || hasAttachments;
 
-  const iconBtn = isDark
-    ? "text-white/65 hover:bg-white/12 hover:text-white"
-    : "text-slate-500 hover:bg-slate-900/8 hover:text-slate-900";
-  const activeBtn = isDark
-    ? "bg-sky-400/25 text-sky-200"
-    : "bg-sky-500/15 text-sky-700";
+  const iconBtn = "text-slate-500 hover:bg-slate-900/8 hover:text-slate-900";
+  const activeBtn = "bg-sky-500/15 text-sky-700";
 
   // Drag the capsule by its orb or any empty area (never hijack inputs / buttons / selects)
   const handleDragMouseDown = (e: React.MouseEvent) => {
@@ -627,9 +621,9 @@ export function PopupWindow() {
         style={{
           borderRadius: isExpanded ? "22px" : "29px",
         }}
-        className={`flex min-h-[58px] w-full flex-col overflow-hidden transition-[border-radius] duration-200 ${
-          isDark ? "frosted-capsule-dark" : "frosted-capsule-light"
-        } ${dragOver ? "ring-2 ring-sky-400/70" : ""}`}
+        className={`frosted-capsule-light flex min-h-[58px] w-full flex-col overflow-hidden transition-[border-radius] duration-200 ${
+          dragOver ? "ring-2 ring-sky-400/70" : ""
+        }`}
       >
         {/* Top Capsule Input Row (58px) — drag empty areas or the left orb to move */}
         <div
@@ -638,11 +632,7 @@ export function PopupWindow() {
         >
           <div
             title="按住拖动可移动输入框"
-            className={`flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-full active:cursor-grabbing ${
-              isDark
-                ? "bg-white/12 text-sky-300"
-                : "bg-sky-500/12 text-sky-600"
-            }`}
+            className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-full bg-sky-500/12 text-sky-600 active:cursor-grabbing"
           >
             <Sparkles
               className={`pointer-events-none h-3.5 w-3.5 ${
@@ -677,11 +667,7 @@ export function PopupWindow() {
                 ? `直接提问，或按 Tab：${suggestions[0] ?? ""}`
                 : "问点什么…"
             }
-            className={`ml-1 min-w-0 flex-1 bg-transparent text-[14px] font-[450] outline-none select-text ${
-              isDark
-                ? "text-white placeholder:text-white/45"
-                : "text-slate-900 placeholder:text-slate-400"
-            }`}
+            className="ml-1 min-w-0 flex-1 bg-transparent text-[14px] font-[450] text-slate-900 placeholder:text-slate-400 outline-none select-text"
           />
 
           {/* Minimal controls */}
@@ -736,9 +722,7 @@ export function PopupWindow() {
                   type="button"
                   onClick={() => void handleSend()}
                   title="发送 (Enter)"
-                  className={`ml-0.5 flex h-7 w-7 items-center justify-center rounded-full shadow-xs transition hover:scale-105 ${
-                    isDark ? "bg-white text-slate-900" : "bg-slate-900 text-white"
-                  }`}
+                  className="ml-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white shadow-xs transition hover:scale-105"
                 >
                   <ArrowUp className="h-3.5 w-3.5" />
                 </button>
@@ -749,20 +733,10 @@ export function PopupWindow() {
 
         {/* Attached Context Bar (Selected Text / Fresh Screenshot / Cropped Image) */}
         {hasAttachments && (
-          <div
-            className={`flex flex-col gap-2 border-t px-4 py-2.5 ${
-              isDark ? "border-white/10" : "border-slate-900/8"
-            }`}
-          >
+          <div className="flex flex-col gap-2 border-t border-slate-900/8 px-4 py-2.5">
             <div className="flex flex-wrap items-center gap-2">
               {attachedText && (
-                <div
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs ${
-                    isDark
-                      ? "border-sky-400/25 bg-sky-400/12 text-sky-200"
-                      : "border-sky-500/25 bg-sky-500/10 text-sky-800"
-                  }`}
-                >
+                <div className="inline-flex items-center gap-1.5 rounded-xl border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-xs text-sky-800">
                   <FileText className="h-3.5 w-3.5 shrink-0" />
                   <button
                     type="button"
@@ -789,11 +763,7 @@ export function PopupWindow() {
               {attachedImages.map((img) => (
                 <div
                   key={img.id}
-                  className={`group relative inline-flex items-center gap-2 rounded-xl border p-1 pr-2.5 text-xs ${
-                    isDark
-                      ? "border-white/14 bg-white/8 text-slate-200"
-                      : "border-slate-900/10 bg-slate-900/5 text-slate-700"
-                  }`}
+                  className="group relative inline-flex items-center gap-2 rounded-xl border border-slate-900/10 bg-slate-900/5 p-1 pr-2.5 text-xs text-slate-700"
                 >
                   <img
                     src={img.dataUrl}
@@ -820,13 +790,7 @@ export function PopupWindow() {
             </div>
 
             {attachedText && showTextPreview && (
-              <div
-                className={`glass-scroll max-h-24 overflow-y-auto rounded-xl px-3 py-2 font-mono text-[11.5px] leading-relaxed select-text ${
-                  isDark
-                    ? "bg-black/25 text-slate-200"
-                    : "bg-slate-900/6 text-slate-700"
-                }`}
-              >
+              <div className="glass-scroll max-h-24 overflow-y-auto rounded-xl bg-slate-900/6 px-3 py-2 font-mono text-[11.5px] leading-relaxed text-slate-700 select-text">
                 {attachedText}
               </div>
             )}
@@ -835,21 +799,13 @@ export function PopupWindow() {
 
         {/* 0ms Smart Input Suggestions Bar */}
         {showSuggestionsBar && suggestions.length > 0 && (
-          <div
-            className={`flex flex-wrap items-center gap-1.5 border-t px-4 py-2.5 ${
-              isDark ? "border-white/10" : "border-slate-900/8"
-            }`}
-          >
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-900/8 px-4 py-2.5">
             {suggestions.map((sug, i) => (
               <button
                 key={sug}
                 type="button"
                 onClick={() => void handleSend(sug)}
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11.5px] transition ${
-                  isDark
-                    ? "border-white/12 bg-white/8 text-slate-200 hover:border-sky-400/40 hover:bg-sky-400/18 hover:text-white"
-                    : "border-slate-900/10 bg-slate-900/5 text-slate-700 hover:border-sky-500/40 hover:bg-sky-500/12 hover:text-sky-900"
-                }`}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-900/10 bg-slate-900/5 px-2.5 py-1 text-[11.5px] text-slate-700 transition hover:border-sky-500/40 hover:bg-sky-500/12 hover:text-sky-900"
               >
                 {i === 0 && !input.trim() && (
                   <span className="rounded bg-current/15 px-1 text-[9.5px] font-mono opacity-75">
@@ -878,18 +834,10 @@ export function PopupWindow() {
             onPointerDown={() => {
               userScrolledRef.current = true;
             }}
-            className={`glass-scroll max-h-[450px] overflow-y-auto border-t px-4 pb-4 pt-3 ${
-              isDark ? "border-white/10" : "border-slate-900/8"
-            }`}
+            className="glass-scroll max-h-[450px] overflow-y-auto border-t border-slate-900/8 px-4 pb-4 pt-3"
           >
             {(needsApiSetup || needKeyNotice) && messages.length === 0 && (
-              <div
-                className={`mb-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${
-                  isDark
-                    ? "bg-amber-400/18 text-amber-100"
-                    : "bg-amber-500/14 text-amber-950"
-                }`}
-              >
+              <div className="mb-2 flex items-center justify-between rounded-xl bg-amber-500/14 px-3 py-2 text-xs text-amber-950">
                 <span>
                   {attachedText
                     ? "已抓取选中内容！先配置 API Key，之后划词按侧键将直接自动解答。"
@@ -916,18 +864,12 @@ export function PopupWindow() {
                             key={imgIdx}
                             src={src}
                             alt=""
-                            className="max-h-24 max-w-[180px] rounded-xl border border-white/15 object-cover"
+                            className="max-h-24 max-w-[180px] rounded-xl border border-slate-900/12 object-cover"
                           />
                         ))}
                       </div>
                     )}
-                    <div
-                      className={`max-w-[85%] rounded-2xl rounded-tr-sm px-3.5 py-2 text-[13.5px] leading-relaxed select-text ${
-                        isDark
-                          ? "bg-white/14 text-white"
-                          : "bg-slate-900/7 text-slate-900"
-                      }`}
-                    >
+                    <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-slate-900/7 px-3.5 py-2 text-[13.5px] leading-relaxed text-slate-900 select-text">
                       {msg.content}
                     </div>
                   </div>
@@ -939,21 +881,17 @@ export function PopupWindow() {
                   >
                     {msg.content.trim() ? (
                       <>
-                        <MarkdownView content={msg.content} isDark={isDark} />
+                        <MarkdownView content={msg.content} />
                         {config?.ui.showSearchSources &&
                           msg.sources &&
                           msg.sources.length > 0 && (
-                            <SourceList sources={msg.sources} isDark={isDark} />
+                            <SourceList sources={msg.sources} />
                           )}
                         <div className="mt-1.5 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                           <button
                             type="button"
                             onClick={() => void handleCopyMessage(msg)}
-                            className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] ${
-                              isDark
-                                ? "text-white/70 hover:bg-white/12"
-                                : "text-slate-600 hover:bg-slate-900/8"
-                            }`}
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-slate-600 hover:bg-slate-900/8"
                           >
                             {copiedId === msg.id ? (
                               <Check className="h-3 w-3" />
@@ -972,24 +910,14 @@ export function PopupWindow() {
               )}
 
               {statusHint && (
-                <div
-                  className={`flex items-center gap-2 text-xs ${
-                    isDark ? "text-sky-200/90" : "text-sky-700/90"
-                  }`}
-                >
+                <div className="flex items-center gap-2 text-xs text-sky-700/90">
                   <span className="inline-block h-2 w-2 rounded-full bg-current animate-pulse-soft" />
                   <span>{statusHint}</span>
                 </div>
               )}
 
               {errorMsg && (
-                <div
-                  className={`rounded-xl border px-3 py-2 text-xs select-text ${
-                    isDark
-                      ? "border-rose-400/35 bg-rose-500/20 text-rose-100"
-                      : "border-rose-500/30 bg-rose-500/12 text-rose-950"
-                  }`}
-                >
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/12 px-3 py-2 text-xs text-rose-950 select-text">
                   <div className="flex items-start justify-between gap-2">
                     <span>{errorMsg}</span>
                     {needsApiSetup && (

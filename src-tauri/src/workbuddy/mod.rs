@@ -651,10 +651,7 @@ impl WorkBuddyKernel {
                     }
                 }
                 save_config(&cfg)?;
-                let mut redacted = cfg.clone();
-                redacted.workbuddy.account = None;
-                redacted.workbuddy.accounts.clear();
-                redacted
+                crate::config::redact_workbuddy_secrets(cfg.clone())
             };
             let _ = app.emit("config:updated", &updated_cfg);
         }
@@ -696,10 +693,7 @@ impl WorkBuddyKernel {
                 }
             }
             save_config(&cfg)?;
-            let mut redacted = cfg.clone();
-            redacted.workbuddy.account = None;
-            redacted.workbuddy.accounts.clear();
-            redacted
+            crate::config::redact_workbuddy_secrets(cfg.clone())
         };
         let _ = app.emit("config:updated", &updated_cfg);
         Ok(())
