@@ -57,7 +57,7 @@ https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
 
 ### 直接安装（普通用户）
 
-- **安装包直装**：前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载最新版安装包（如 `BTW-Float_1.1.1_x64-setup.exe`），双击安装即可，无需安装 Node.js 或 Rust。
+- **安装包直装**：前往 **[Releases](https://github.com/Bugsoon/BTW-Float/releases/latest)** 下载最新版安装包（如 `BTW-Float_1.1.2_x64-setup.exe`），双击安装即可，无需安装 Node.js 或 Rust。
 - **通过 Scoop 安装**：
   ```powershell
   scoop bucket add btw-float https://github.com/Bugsoon/BTW-Float
@@ -133,8 +133,7 @@ BTW-Float/
 │   │   └── SourceList.tsx     # 可选联网参考来源展示
 │   ├── lib/
 │   │   ├── commands.ts        # Tauri IPC 命令封装
-│   │   ├── suggestions.ts     # 0ms 本地联想词、划词 Prompt 与图片压缩
-│   │   └── theme.ts           # 跟随系统浅色/深色主题
+│   │   └── suggestions.ts     # 0ms 本地联想词、划词 Prompt 与图片压缩
 │   └── types/app.ts           # 前后端共享类型定义
 └── src-tauri/                 # Rust + Win32 原生后端
     ├── Cargo.toml             # Rust 依赖与 Release 体积优化配置
