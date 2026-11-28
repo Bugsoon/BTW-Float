@@ -1,32 +1,32 @@
 {
-    "version": "1.1.1",
-    "description": "Lightweight /btw-style AI floating desktop assistant for Windows 11",
-    "homepage": "https://github.com/Bugsoon/BTW-Float",
-    "license": "MIT",
-    "architecture": {
-        "64bit": {
-            "url": "https://github.com/Bugsoon/BTW-Float/releases/download/v1.1.1/BTW-Float_1.1.1_x64-setup.exe#/dl.7z",
-            "hash": "6db3f247e749fb6dfb479c27ebc791f9cc30c1ffd77a1f4ba4180a908222646e"
-        }
-    },
-    "pre_install": "Remove-Item \"$dir\\`$PLUGINSDIR\", \"$dir\\uninstall.exe\" -Force -Recurse -ErrorAction SilentlyContinue",
-    "shortcuts": [
-        [
-            "btw-float.exe",
-            "BTW-Float"
-        ]
-    ],
-    "checkver": {
-        "github": "https://github.com/Bugsoon/BTW-Float"
-    },
-    "autoupdate": {
-        "architecture": {
-            "64bit": {
-                "url": "https://github.com/Bugsoon/BTW-Float/releases/download/v$version/BTW-Float_$version_x64-setup.exe#/dl.7z",
-                "hash": {
-                    "url": "https://github.com/Bugsoon/BTW-Float/releases/download/v$version/SHA256SUMS.txt"
-                }
-            }
-        }
+  "version": "1.1.2",
+  "description": "Lightweight /btw-style AI floating desktop assistant for Windows 11",
+  "homepage": "https://github.com/Bugsoon/BTW-Float",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/Bugsoon/BTW-Float/releases/download/v1.1.2/BTW-Float_1.1.2_x64-setup.exe#/dl.7z",
+      "hash": "94d0e499bb4bc9b4dc9cec53a41d3e4aa05746fbec41563e4c2e884ae7ddfa7f"
     }
+  },
+  "pre_install": "Remove-Item \"$dir\\`$PLUGINSDIR\", \"$dir\\uninstall.exe\" -Force -Recurse -ErrorAction SilentlyContinue",
+  "shortcuts": [
+    [
+      "btw-float.exe",
+      "BTW-Float"
+    ]
+  ],
+  "checkver": {
+    "github": "https://github.com/Bugsoon/BTW-Float"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/Bugsoon/BTW-Float/releases/download/v$version/BTW-Float_$version_x64-setup.exe#/dl.7z",
+        "hash": {
+          "url": "https://github.com/Bugsoon/BTW-Float/releases/download/v$version/SHA256SUMS.txt"
+        }
+      }
+    }
+  }
 }
