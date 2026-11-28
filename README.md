@@ -60,7 +60,7 @@ https://github.com/user-attachments/assets/489fb973-a47d-4808-afb8-903757c01d06
 
 ### 直接安装（普通用户）
 
-- **安装包直装（Releases）**：前往 **[GitHub Releases](https://github.com/Bugsoon/BTW-Float/releases)**，找到带 `Pre-release` 标记且版本号含 `-wb` 后缀的 **WorkBuddy 内置版**（如 `v1.2.0-wb.1`），下载对应安装包（如 `BTW-Float_1.2.0-wb.1_x64-setup.exe`）双击安装即可，无需安装 Node.js 或 Rust。
+- **安装包直装（Releases）**：前往 **[GitHub Releases](https://github.com/Bugsoon/BTW-Float/releases)**，找到带 `Pre-release` 标记且版本号含 `-wb` 后缀的 **WorkBuddy 内置版**（如 `v1.2.0-wb.2`），下载对应安装包（如 `BTW-Float_1.2.0-wb.2_x64-setup.exe`）双击安装即可，无需安装 Node.js 或 Rust。
 
 > 安装包未做代码签名，Windows SmartScreen 可能提示「未知发布者」。点击 **更多信息 → 仍要运行** 即可。
 > 如需纯 BYOK 主线版（支持 Scoop / Winget），请切换至 [`main`](https://github.com/Bugsoon/BTW-Float/tree/main) 分支。
@@ -83,7 +83,7 @@ pnpm tauri dev
 
 ### 打包发布（NSIS 安装包）
 
-本分支的 [GitHub Actions 自动构建发布工作流](./.github/workflows/release.yml) 已隔离为 **Pre-release** 模式：推送 `v*-wb*` 标签（如 `git tag v1.2.0-wb.1 && git push origin v1.2.0-wb.1`）或在 Actions 页面手动选择本分支触发 workflow 后，CI 会在 `windows-latest` 上自动执行前端构建、Rust 单元测试、NSIS 打包，生成 `SHA256SUMS.txt` 与 **GitHub Build Provenance（SLSA）构建来源证明**，并发布为 GitHub **Pre-release**（不会覆盖 `main` 的 Latest Release 或 Scoop 清单）。
+本分支的 [GitHub Actions 自动构建发布工作流](./.github/workflows/release.yml) 已隔离为 **Pre-release** 模式：推送 `v*-wb*` 标签（如 `git tag v1.2.0-wb.2 && git push origin v1.2.0-wb.2`）或在 Actions 页面手动选择本分支触发 workflow 后，CI 会在 `windows-latest` 上自动执行前端构建、Rust 单元测试、NSIS 打包，生成 `SHA256SUMS.txt` 与 **GitHub Build Provenance（SLSA）构建来源证明**，并发布为 GitHub **Pre-release**（不会覆盖 `main` 的 Latest Release 或 Scoop 清单）。
 
 本地构建命令：
 
