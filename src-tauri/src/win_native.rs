@@ -1,6 +1,15 @@
 #[cfg(not(windows))]
 use tokio::sync::mpsc::UnboundedSender;
 
+pub const WIN32_WS_EX_TOOLWINDOW: u32 = 0x0000_0080;
+pub const WIN32_WS_EX_APPWINDOW: u32 = 0x0004_0000;
+
+/// Forces WS_EX_TOOLWINDOW and removes WS_EX_APPWINDOW so Windows excludes the window
+/// from Taskbar, Alt+Tab, Win+Tab, and Task Manager's foreground "Apps" section.
+pub fn sanitize_tool_window_ex_style(ex_style: u32) -> u32 {
+    (ex_style | WIN32_WS_EX_TOOLWINDOW) & !WIN32_WS_EX_APPWINDOW
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct WorkArea {
     pub left: i32,
@@ -24,13 +33,15 @@ pub enum BallInputEvent {
 mod imp {
     use super::{BallInputEvent, WorkArea};
     use parking_lot::Mutex;
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeSet, HashMap};
     use std::ffi::c_void;
     use std::mem::size_of;
     use std::sync::OnceLock;
     use tokio::sync::mpsc::UnboundedSender;
+    use windows::core::PCWSTR;
     use windows::Win32::Foundation::{
-        BOOL, CloseHandle, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM,
+        BOOL, CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HINSTANCE, HWND, LPARAM,
+        LRESULT, POINT, RECT, WPARAM,
     };
     use windows::Win32::Graphics::Dwm::{
         DwmSetWindowAttribute, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
@@ -49,20 +60,23 @@ mod imp {
         HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE, REG_SZ, REG_VALUE_TYPE,
     };
     use windows::Win32::System::Threading::{
-        AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW,
-        PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION,
+        AttachThreadInput, CreateMutexW, GetCurrentThreadId, OpenProcess,
+        QueryFullProcessImageNameW, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION,
     };
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         EnableWindow, ReleaseCapture, SetCapture, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT,
     };
     use windows::Win32::UI::Shell::{DragAcceptFiles, DragFinish, DragQueryFileW, HDROP};
     use windows::Win32::UI::WindowsAndMessaging::{
-        BringWindowToTop, CallWindowProcW, EnumChildWindows, GetClassNameW, GetCursorPos,
-        GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId, SetForegroundWindow,
-        SetWindowLongPtrW, SetWindowPos, ShowWindow, GWLP_WNDPROC, MA_NOACTIVATE, SWP_NOACTIVATE,
-        SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOW, SW_SHOWNOACTIVATE, WM_CREATE, WM_DROPFILES,
-        WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PARENTNOTIFY,
-        WM_RBUTTONUP, WNDPROC,
+        BringWindowToTop, CallWindowProcW, CreateWindowExW, DefWindowProcW, DispatchMessageW,
+        EnumChildWindows, FindWindowExW, GetClassNameW, GetCursorPos, GetForegroundWindow,
+        GetMessageW, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, PostMessageW,
+        RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, SetWindowLongW, SetWindowPos,
+        ShowWindow, TranslateMessage, GWLP_WNDPROC, GWL_EXSTYLE, HWND_MESSAGE, MA_NOACTIVATE, MSG,
+        STYLESTRUCT, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+        SW_HIDE, SW_SHOW, SW_SHOWNOACTIVATE, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CREATE,
+        WM_DROPFILES, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_NCDESTROY,
+        WM_PARENTNOTIFY, WM_RBUTTONUP, WM_STYLECHANGING, WNDCLASSW, WNDPROC,
     };
 
     const WM_MOUSELEAVE_MSG: u32 = 0x02A3;
@@ -121,6 +135,7 @@ mod imp {
             st.orig_proc = prev;
             st.tx = Some(tx);
         }
+        apply_background_tool_window_style(hwnd_raw);
 
         // WebView2 creates Chrome_WidgetWin_0 asynchronously (~100-400ms after setup);
         // re-disable child hit-testing so clicks always reach `ball_wnd_proc` directly.
@@ -139,6 +154,12 @@ mod imp {
         l_param: LPARAM,
     ) -> LRESULT {
         match msg {
+            WM_STYLECHANGING => {
+                if (w_param.0 as i32) == GWL_EXSTYLE.0 && l_param.0 != 0 {
+                    let ss = &mut *(l_param.0 as *mut STYLESTRUCT);
+                    ss.styleNew = super::sanitize_tool_window_ex_style(ss.styleNew);
+                }
+            }
             WM_MOUSEACTIVATE => {
                 return LRESULT(MA_NOACTIVATE as isize);
             }
@@ -398,11 +419,11 @@ mod imp {
         }
     }
 
-    /// Applies Win11 dark immersive titlebar & rounded corners for the Settings window.
+    /// Applies Win11 light immersive titlebar & rounded corners for the Settings window.
     pub fn apply_win11_settings_backdrop(hwnd_raw: isize) {
         unsafe {
             let hwnd = HWND(hwnd_raw as _);
-            let dark: u32 = 1;
+            let dark: u32 = 0;
             let _ = DwmSetWindowAttribute(
                 hwnd,
                 DWMWA_USE_IMMERSIVE_DARK_MODE,
@@ -681,13 +702,226 @@ mod imp {
             let _ = RegCloseKey(hkey);
         }
     }
+
+    pub fn apply_background_tool_window_style(hwnd_raw: isize) {
+        if hwnd_raw == 0 {
+            return;
+        }
+        unsafe {
+            let hwnd = HWND(hwnd_raw as _);
+            let cur = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+            let next = super::sanitize_tool_window_ex_style(cur);
+            if next != cur {
+                let _ = SetWindowLongW(hwnd, GWL_EXSTYLE, next as i32);
+                let _ = SetWindowPos(
+                    hwnd,
+                    HWND::default(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+                );
+            }
+        }
+    }
+
+    static TOOL_WIN_ORIG_PROCS: OnceLock<Mutex<HashMap<isize, isize>>> = OnceLock::new();
+
+    fn tool_win_orig_procs() -> &'static Mutex<HashMap<isize, isize>> {
+        TOOL_WIN_ORIG_PROCS.get_or_init(|| Mutex::new(HashMap::new()))
+    }
+
+    /// Subclasses a window (`popup`, `capture`) to intercept `WM_STYLECHANGING` so tao/winit
+    /// cannot re-add `WS_EX_APPWINDOW` or strip `WS_EX_TOOLWINDOW` on show/hide transitions.
+    pub fn install_tool_window_style_lock(hwnd_raw: isize) {
+        if hwnd_raw == 0 {
+            return;
+        }
+        {
+            let mut map = tool_win_orig_procs().lock();
+            if !map.contains_key(&hwnd_raw) {
+                unsafe {
+                    let hwnd = HWND(hwnd_raw as _);
+                    let prev = SetWindowLongPtrW(
+                        hwnd,
+                        GWLP_WNDPROC,
+                        tool_window_wnd_proc as *const () as usize as isize,
+                    );
+                    map.insert(hwnd_raw, prev);
+                }
+            }
+        }
+        apply_background_tool_window_style(hwnd_raw);
+    }
+
+    unsafe extern "system" fn tool_window_wnd_proc(
+        hwnd: HWND,
+        msg: u32,
+        w_param: WPARAM,
+        l_param: LPARAM,
+    ) -> LRESULT {
+        if msg == WM_STYLECHANGING && (w_param.0 as i32) == GWL_EXSTYLE.0 && l_param.0 != 0 {
+            let ss = &mut *(l_param.0 as *mut STYLESTRUCT);
+            ss.styleNew = super::sanitize_tool_window_ex_style(ss.styleNew);
+        }
+
+        let key = hwnd.0 as isize;
+        let orig = {
+            let mut map = tool_win_orig_procs().lock();
+            if msg == WM_NCDESTROY {
+                map.remove(&key).unwrap_or(0)
+            } else {
+                map.get(&key).copied().unwrap_or(0)
+            }
+        };
+
+        if orig != 0 {
+            let proc: WNDPROC = std::mem::transmute(orig);
+            CallWindowProcW(proc, hwnd, msg, w_param, l_param)
+        } else {
+            DefWindowProcW(hwnd, msg, w_param, l_param)
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    const SINGLE_INSTANCE_MUTEX: &str = "Local\\BTW-Float-Dev-SingleInstance-Mutex\0";
+    #[cfg(not(debug_assertions))]
+    const SINGLE_INSTANCE_MUTEX: &str = "Local\\BTW-Float-SingleInstance-Mutex\0";
+
+    #[cfg(debug_assertions)]
+    const SINGLE_INSTANCE_WND_CLASS: &str = "BTWFloatSingleInstanceWindowDev\0";
+    #[cfg(not(debug_assertions))]
+    const SINGLE_INSTANCE_WND_CLASS: &str = "BTWFloatSingleInstanceWindow\0";
+
+    const WM_WAKE_EXISTING_INSTANCE: u32 = WM_APP + 1;
+
+    static WAKE_TX: OnceLock<UnboundedSender<()>> = OnceLock::new();
+
+    pub struct SingleInstanceGuard(Option<HANDLE>);
+
+    impl Drop for SingleInstanceGuard {
+        fn drop(&mut self) {
+            if let Some(handle) = self.0.take() {
+                unsafe {
+                    let _ = CloseHandle(handle);
+                }
+            }
+        }
+    }
+
+    /// Acquires a per-session named mutex; if another instance is already running, posts a wakeup
+    /// message to its hidden `HWND_MESSAGE` IPC window and returns `None` so the second process exits.
+    pub fn acquire_single_instance_or_wake() -> Option<SingleInstanceGuard> {
+        let mutex_wide: Vec<u16> = SINGLE_INSTANCE_MUTEX.encode_utf16().collect();
+        unsafe {
+            match CreateMutexW(None, false, PCWSTR(mutex_wide.as_ptr())) {
+                Ok(handle) => {
+                    if GetLastError() == ERROR_ALREADY_EXISTS {
+                        let cls_wide: Vec<u16> = SINGLE_INSTANCE_WND_CLASS.encode_utf16().collect();
+                        for _ in 0..5 {
+                            if let Ok(hwnd) = FindWindowExW(
+                                HWND_MESSAGE,
+                                HWND::default(),
+                                PCWSTR(cls_wide.as_ptr()),
+                                PCWSTR::null(),
+                            ) {
+                                if !hwnd.0.is_null() {
+                                    let _ = PostMessageW(
+                                        hwnd,
+                                        WM_WAKE_EXISTING_INSTANCE,
+                                        WPARAM(0),
+                                        LPARAM(0),
+                                    );
+                                    break;
+                                }
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(60));
+                        }
+                        let _ = CloseHandle(handle);
+                        None
+                    } else {
+                        Some(SingleInstanceGuard(Some(handle)))
+                    }
+                }
+                Err(_) => Some(SingleInstanceGuard(None)),
+            }
+        }
+    }
+
+    unsafe extern "system" fn instance_ipc_wnd_proc(
+        hwnd: HWND,
+        msg: u32,
+        w_param: WPARAM,
+        l_param: LPARAM,
+    ) -> LRESULT {
+        if msg == WM_WAKE_EXISTING_INSTANCE {
+            if let Some(tx) = WAKE_TX.get() {
+                let _ = tx.send(());
+            }
+            return LRESULT(0);
+        }
+        DefWindowProcW(hwnd, msg, w_param, l_param)
+    }
+
+    pub fn start_single_instance_listener(tx: UnboundedSender<()>) {
+        let _ = WAKE_TX.set(tx);
+        std::thread::Builder::new()
+            .name("btw-instance-ipc".into())
+            .spawn(|| unsafe {
+                let class_name: Vec<u16> = SINGLE_INSTANCE_WND_CLASS.encode_utf16().collect();
+                let wc = WNDCLASSW {
+                    lpfnWndProc: Some(instance_ipc_wnd_proc),
+                    hInstance: HINSTANCE::default(),
+                    lpszClassName: PCWSTR(class_name.as_ptr()),
+                    ..Default::default()
+                };
+                let _ = RegisterClassW(&wc);
+
+                let Ok(_hwnd) = CreateWindowExW(
+                    WINDOW_EX_STYLE::default(),
+                    PCWSTR(class_name.as_ptr()),
+                    PCWSTR::null(),
+                    WINDOW_STYLE::default(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    HWND_MESSAGE,
+                    None,
+                    HINSTANCE::default(),
+                    None,
+                ) else {
+                    return;
+                };
+
+                let mut msg = MSG::default();
+                while GetMessageW(&mut msg, HWND::default(), 0, 0).as_bool() {
+                    let _ = TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+            })
+            .ok();
+    }
 }
 
 #[cfg(windows)]
 pub use imp::*;
 
 #[cfg(not(windows))]
+pub struct SingleInstanceGuard;
+#[cfg(not(windows))]
 pub fn install_ball_input_handler(_: isize, _: UnboundedSender<BallInputEvent>) {}
+#[cfg(not(windows))]
+pub fn apply_background_tool_window_style(_: isize) {}
+#[cfg(not(windows))]
+pub fn install_tool_window_style_lock(_: isize) {}
+#[cfg(not(windows))]
+pub fn acquire_single_instance_or_wake() -> Option<SingleInstanceGuard> {
+    Some(SingleInstanceGuard)
+}
+#[cfg(not(windows))]
+pub fn start_single_instance_listener(_: UnboundedSender<()>) {}
 #[cfg(not(windows))]
 pub fn hide_hwnd_now(_: isize) {}
 #[cfg(not(windows))]
@@ -739,3 +973,31 @@ pub fn get_system_proxy_url() -> Option<String> {
 }
 #[cfg(not(windows))]
 pub fn apply_autostart(_: bool) {}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        sanitize_tool_window_ex_style, WIN32_WS_EX_APPWINDOW, WIN32_WS_EX_TOOLWINDOW,
+    };
+
+    #[test]
+    fn sanitize_tool_window_ex_style_enforces_toolwindow_and_clears_appwindow() {
+        const WS_EX_TOPMOST: u32 = 0x0000_0008;
+        const WS_EX_NOREDIRECTIONBITMAP: u32 = 0x0020_0000;
+        const WS_EX_NOACTIVATE: u32 = 0x0800_0000;
+
+        let initial = WS_EX_TOPMOST
+            | WIN32_WS_EX_APPWINDOW
+            | WS_EX_NOREDIRECTIONBITMAP
+            | WS_EX_NOACTIVATE;
+        let sanitized = sanitize_tool_window_ex_style(initial);
+
+        assert_ne!(sanitized & WIN32_WS_EX_TOOLWINDOW, 0);
+        assert_eq!(sanitized & WIN32_WS_EX_APPWINDOW, 0);
+        assert_eq!(
+            sanitized & (WS_EX_TOPMOST | WS_EX_NOREDIRECTIONBITMAP | WS_EX_NOACTIVATE),
+            WS_EX_TOPMOST | WS_EX_NOREDIRECTIONBITMAP | WS_EX_NOACTIVATE
+        );
+        assert_eq!(sanitize_tool_window_ex_style(sanitized), sanitized);
+    }
+}

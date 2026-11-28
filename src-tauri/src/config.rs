@@ -288,3 +288,24 @@ fn dpapi_decrypt(b64: &str) -> Result<String, String> {
     let bytes = BASE64.decode(b64).map_err(|e| e.to_string())?;
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{AppConfig, UiConfig};
+
+    #[test]
+    fn default_config_shows_ball_while_staying_background_resident() {
+        let cfg = AppConfig::default();
+        assert!(cfg.ui.show_ball);
+    }
+
+    #[test]
+    fn ui_config_deserializes_missing_show_ball_as_true_and_preserves_false() {
+        let without_field: UiConfig = serde_json::from_str("{}").expect("valid empty UiConfig");
+        assert!(without_field.show_ball);
+
+        let with_false: UiConfig =
+            serde_json::from_str(r#"{"showBall": false}"#).expect("valid UiConfig with showBall");
+        assert!(!with_false.show_ball);
+    }
+}

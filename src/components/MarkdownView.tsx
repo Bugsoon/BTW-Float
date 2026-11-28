@@ -6,17 +6,14 @@ import { Check, Copy } from "lucide-react";
 
 interface MarkdownViewProps {
   content: string;
-  isDark: boolean;
 }
 
 function CodeBlock({
   code,
   lang,
-  isDark,
 }: {
   code: string;
   lang: string;
-  isDark: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -31,31 +28,15 @@ function CodeBlock({
   };
 
   return (
-    <div
-      className={`my-2 overflow-hidden rounded-xl border ${
-        isDark
-          ? "border-white/12 bg-black/35"
-          : "border-slate-900/12 bg-slate-900/8"
-      }`}
-    >
-      <div
-        className={`flex items-center justify-between px-3 py-1 text-[11px] ${
-          isDark
-            ? "border-b border-white/10 text-slate-300/80"
-            : "border-b border-slate-900/10 text-slate-600"
-        }`}
-      >
+    <div className="my-2 overflow-hidden rounded-xl border border-slate-900/12 bg-slate-900/8">
+      <div className="flex items-center justify-between border-b border-slate-900/10 px-3 py-1 text-[11px] text-slate-600">
         <span className="font-mono uppercase tracking-wider">
           {lang || "code"}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 transition ${
-            isDark
-              ? "hover:bg-white/10 text-slate-200"
-              : "hover:bg-slate-900/10 text-slate-700"
-          }`}
+          className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-slate-700 transition hover:bg-slate-900/10"
         >
           {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
           <span>{copied ? "已复制" : "复制"}</span>
@@ -68,13 +49,9 @@ function CodeBlock({
   );
 }
 
-export function MarkdownView({ content, isDark }: MarkdownViewProps) {
+export function MarkdownView({ content }: MarkdownViewProps) {
   return (
-    <div
-      className={`select-text text-[13.5px] leading-relaxed break-words ${
-        isDark ? "text-slate-100" : "text-slate-900"
-      }`}
-    >
+    <div className="select-text text-[13.5px] leading-relaxed break-words text-slate-900">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -106,13 +83,7 @@ export function MarkdownView({ content, isDark }: MarkdownViewProps) {
             </h3>
           ),
           blockquote: ({ children }) => (
-            <blockquote
-              className={`my-2 border-l-2 pl-3 italic ${
-                isDark
-                  ? "border-sky-300/60 text-slate-300"
-                  : "border-sky-600/60 text-slate-700"
-              }`}
-            >
+            <blockquote className="my-2 border-l-2 border-sky-600/60 pl-3 italic text-slate-700">
               {children}
             </blockquote>
           ),
@@ -123,11 +94,7 @@ export function MarkdownView({ content, isDark }: MarkdownViewProps) {
                 e.preventDefault();
                 if (href) void openUrl(href);
               }}
-              className={`underline decoration-1 underline-offset-2 ${
-                isDark
-                  ? "text-sky-300 hover:text-sky-200"
-                  : "text-sky-700 hover:text-sky-600"
-              }`}
+              className="text-sky-700 underline decoration-1 underline-offset-2 hover:text-sky-600"
             >
               {children}
             </a>
@@ -138,13 +105,7 @@ export function MarkdownView({ content, isDark }: MarkdownViewProps) {
             const isBlock = Boolean(match) || raw.includes("\n");
             if (!isBlock) {
               return (
-                <code
-                  className={`rounded-md px-1.5 py-0.5 font-mono text-[12px] ${
-                    isDark
-                      ? "bg-white/14 text-sky-200"
-                      : "bg-slate-900/10 text-sky-800"
-                  }`}
-                >
+                <code className="rounded-md bg-slate-900/10 px-1.5 py-0.5 font-mono text-[12px] text-sky-800">
                   {raw}
                 </code>
               );
@@ -153,39 +114,24 @@ export function MarkdownView({ content, isDark }: MarkdownViewProps) {
               <CodeBlock
                 code={raw}
                 lang={match?.[1] ?? ""}
-                isDark={isDark}
               />
             );
           },
           pre: ({ children }) => <>{children}</>,
           table: ({ children }) => (
             <div className="glass-scroll my-2 overflow-x-auto">
-              <table
-                className={`w-full border-collapse text-left text-[12.5px] ${
-                  isDark ? "border-white/15" : "border-slate-900/15"
-                }`}
-              >
+              <table className="w-full border-collapse border-slate-900/15 text-left text-[12.5px]">
                 {children}
               </table>
             </div>
           ),
           th: ({ children }) => (
-            <th
-              className={`border px-2 py-1 font-medium ${
-                isDark
-                  ? "border-white/15 bg-white/8"
-                  : "border-slate-900/15 bg-slate-900/6"
-              }`}
-            >
+            <th className="border border-slate-900/15 bg-slate-900/6 px-2 py-1 font-medium">
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td
-              className={`border px-2 py-1 ${
-                isDark ? "border-white/12" : "border-slate-900/12"
-              }`}
-            >
+            <td className="border border-slate-900/12 px-2 py-1">
               {children}
             </td>
           ),

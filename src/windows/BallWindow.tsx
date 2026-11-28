@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Sparkles } from "lucide-react";
 import { getBallEdgeState } from "../lib/commands";
-import { useSystemDark } from "../lib/theme";
 
 interface BallUiState {
   hovered?: boolean | null;
@@ -15,7 +14,6 @@ interface BallEdgeState {
 }
 
 export function BallWindow() {
-  const isDark = useSystemDark();
   const [edgeState, setEdgeState] = useState<BallEdgeState>({
     edge: "none",
     cssSlide: false,
@@ -65,9 +63,7 @@ export function BallWindow() {
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden bg-transparent pb-1">
       <div
-        className={`relative flex h-[52px] w-[52px] items-center justify-center rounded-full transition-all duration-200 ease-out ${
-          isDark ? "frosted-orb-dark" : "frosted-orb-light"
-        }`}
+        className="frosted-orb-light relative flex h-[52px] w-[52px] items-center justify-center rounded-full transition-all duration-200 ease-out"
         style={{
           opacity: isPeeked ? 0.74 : 1,
           transform: `translateX(${cssOffsetX}px) scale(${scale})`,
@@ -77,15 +73,12 @@ export function BallWindow() {
         <div
           className="pointer-events-none absolute left-2.5 top-1.5 h-2.5 w-6 rounded-full"
           style={{
-            background: isDark
-              ? "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, transparent 100%)"
-              : "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, transparent 100%)",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, transparent 100%)",
           }}
         />
         <Sparkles
-          className={`relative z-10 h-[20px] w-[20px] ${
-            isDark ? "text-sky-300" : "text-sky-600"
-          }`}
+          className="relative z-10 h-[20px] w-[20px] text-sky-600"
           strokeWidth={2.1}
         />
       </div>

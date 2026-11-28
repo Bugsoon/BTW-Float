@@ -225,20 +225,20 @@ function ProcessPickerSection({
 
   const chipStyle =
     accent === "rose"
-      ? "border-rose-400/25 bg-rose-500/12 text-rose-100"
-      : "border-white/12 bg-white/8 text-slate-200";
+      ? "border-rose-200 bg-rose-50 text-rose-700"
+      : "border-slate-200 bg-white text-slate-700";
 
   return (
-    <div className="space-y-2.5 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+    <div className="space-y-2.5 rounded-xl border border-slate-200/80 bg-slate-50/90 px-3.5 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[13px] text-white">{title}</div>
-          <div className="text-[11px] text-slate-400">{desc}</div>
+          <div className="text-[13px] text-slate-900">{title}</div>
+          <div className="text-[11px] text-slate-500">{desc}</div>
         </div>
         <button
           type="button"
           onClick={() => void handleToggle()}
-          className="flex items-center gap-1 rounded-lg border border-white/14 bg-white/8 px-2.5 py-1 text-xs text-sky-200 transition hover:bg-white/14"
+          className="flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs text-sky-700 transition hover:bg-sky-100"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>{open ? "收起选择" : "添加软件"}</span>
@@ -256,7 +256,7 @@ function ProcessPickerSection({
               <button
                 type="button"
                 onClick={() => onRemove(proc)}
-                className="text-slate-400 hover:text-rose-300"
+                className="text-slate-400 hover:text-rose-600"
                 title="移除"
               >
                 <X className="h-3 w-3" />
@@ -267,7 +267,7 @@ function ProcessPickerSection({
       )}
 
       {open && (
-        <div className="space-y-2 rounded-xl border border-sky-400/25 bg-black/35 p-2.5">
+        <div className="space-y-2 rounded-xl border border-sky-200 bg-white p-2.5 shadow-xs">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -282,13 +282,13 @@ function ProcessPickerSection({
                   }
                 }}
                 placeholder="输入关键词模糊匹配当前进程，或直接输入程序名回车添加"
-                className="w-full rounded-lg border border-white/12 bg-black/30 py-1.5 pl-8 pr-2.5 text-xs outline-none focus:border-sky-400/60 select-text"
+                className="w-full rounded-lg border border-slate-300/90 bg-slate-50 py-1.5 pl-8 pr-2.5 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-sky-400/60 select-text"
               />
             </div>
             <button
               type="button"
               onClick={submitInput}
-              className="rounded-lg bg-white/12 px-3 py-1.5 text-xs hover:bg-white/20"
+              className="rounded-lg bg-slate-200/80 px-3 py-1.5 text-xs text-slate-800 transition hover:bg-slate-300/80"
             >
               添加
             </button>
@@ -297,7 +297,7 @@ function ProcessPickerSection({
               onClick={() => void handleRefresh()}
               disabled={refreshing}
               title="刷新当前运行的进程列表"
-              className="rounded-lg border border-white/10 bg-white/6 px-2 py-1.5 text-slate-300 transition hover:bg-white/14 disabled:opacity-50"
+              className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-slate-600 transition hover:bg-slate-200 disabled:opacity-50"
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
@@ -306,7 +306,7 @@ function ProcessPickerSection({
           </div>
 
           <div>
-            <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-400">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-500">
               <span>
                 {query.trim()
                   ? `模糊匹配到 ${filteredProcs.length} 个运行中进程（点击直接添加）：`
@@ -329,8 +329,8 @@ function ProcessPickerSection({
                       }}
                       className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
                         already
-                          ? "border-sky-400/30 bg-sky-500/15 text-sky-200 opacity-60"
-                          : "border-white/10 bg-white/6 text-slate-200 hover:border-sky-400/40 hover:bg-sky-500/20"
+                          ? "border-sky-200 bg-sky-50 text-sky-700 opacity-75"
+                          : "border-slate-200 bg-slate-50 text-slate-700 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
                       }`}
                     >
                       {already ? `✓ ${proc}` : `+ ${proc}`}
@@ -339,7 +339,7 @@ function ProcessPickerSection({
                 })}
               </div>
             ) : (
-              <div className="py-1 text-[11px] text-slate-500">
+              <div className="py-1 text-[11px] text-slate-400">
                 未找到匹配的运行中进程，可直接按回车或点击「添加」手动录入程序名
               </div>
             )}
@@ -364,7 +364,7 @@ function ToggleSwitch({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-        checked ? "bg-sky-500" : "bg-white/18 hover:bg-white/25"
+        checked ? "bg-sky-500" : "bg-slate-300 hover:bg-slate-400/80"
       }`}
     >
       <span
@@ -423,6 +423,24 @@ export function SettingsWindow() {
 
   useEffect(() => {
     void getConfig().then(setConfig);
+    const unlistenPromise = listen<AppConfig>("config:updated", (ev) => {
+      setConfig((prev) =>
+        prev
+          ? {
+              ...prev,
+              ui: {
+                ...prev.ui,
+                showBall: ev.payload.ui.showBall,
+                autostart: ev.payload.ui.autostart,
+                defaultWebSearch: ev.payload.ui.defaultWebSearch,
+              },
+            }
+          : ev.payload
+      );
+    });
+    return () => {
+      void unlistenPromise.then((fn) => fn());
+    };
   }, []);
 
   // Separate mouse side-button detection vs keyboard shortcut recording
@@ -763,27 +781,42 @@ export function SettingsWindow() {
     );
   };
 
+  const cardCls =
+    "border-slate-200/90 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+  const rowCls = "border-slate-200/80 bg-slate-50/90";
+  const inputCls =
+    "border-slate-300/90 bg-white text-slate-900 placeholder:text-slate-400";
+  const titleCls = "text-slate-900";
+  const mutedCls = "text-slate-500";
+  const iconAccentCls = "text-sky-600";
+
   if (!config) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0f131c] text-sm text-slate-300">
+      <div
+        style={{ colorScheme: "light" }}
+        className="flex h-full items-center justify-center bg-[#f5f7fb] text-sm text-slate-600"
+      >
         正在加载配置...
       </div>
     );
   }
 
   return (
-    <div className="flex h-full w-full flex-col bg-[#0f131c] text-slate-100">
+    <div
+      style={{ colorScheme: "light" }}
+      className="flex h-full w-full flex-col bg-[#f5f7fb] text-slate-900"
+    >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-slate-200/90 bg-white/80 px-6 py-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-400/20 text-sky-300">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/12 text-sky-600">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
             <h1 className="text-[15px] font-semibold leading-tight">
               BTW-Float 设置
             </h1>
-            <p className="text-[11.5px] text-slate-400">
+            <p className={`text-[11.5px] ${mutedCls}`}>
               API Key 使用 Windows DPAPI 本地加密保存
             </p>
           </div>
@@ -791,7 +824,7 @@ export function SettingsWindow() {
 
         <div className="flex items-center gap-3">
           {savedToast && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1 text-xs text-emerald-200">
+            <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-700">
               <Check className="h-3.5 w-3.5" />
               {savedToast}
             </span>
@@ -811,7 +844,7 @@ export function SettingsWindow() {
       {/* Main layout */}
       <div className="flex min-h-0 flex-1">
         {/* Sidebar tabs */}
-        <nav className="w-44 shrink-0 space-y-1 border-r border-white/10 p-3">
+        <nav className="w-44 shrink-0 space-y-1 border-r border-slate-200/90 bg-white/60 p-3">
           {[
             { id: "models" as const, label: "模型与 API", icon: Sparkles },
             {
@@ -819,7 +852,7 @@ export function SettingsWindow() {
               label: "快捷键与侧键",
               icon: MousePointerClick,
             },
-            { id: "ui" as const, label: "悬浮球与交互", icon: Sliders },
+            { id: "ui" as const, label: "后台与交互", icon: Sliders },
           ].map((item) => {
             const Icon = item.icon;
             const active = tab === item.id;
@@ -830,8 +863,8 @@ export function SettingsWindow() {
                 onClick={() => setTab(item.id)}
                 className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] transition ${
                   active
-                    ? "bg-white/14 font-medium text-white"
-                    : "text-slate-300 hover:bg-white/8 hover:text-white"
+                    ? "bg-sky-500/12 font-medium text-sky-700"
+                    : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -847,13 +880,13 @@ export function SettingsWindow() {
             <div className="space-y-5">
               {/* Quick presets */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-slate-400">快速添加模板：</span>
+                <span className={`text-xs ${mutedCls}`}>快速添加模板：</span>
                 {PROVIDER_PRESETS.map((preset) => (
                   <button
                     key={preset.name}
                     type="button"
                     onClick={() => addProvider(preset)}
-                    className="rounded-lg border border-white/12 bg-white/6 px-2.5 py-1 text-xs text-slate-200 transition hover:bg-white/14"
+                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 transition hover:bg-slate-100"
                   >
                     + {preset.name}
                   </button>
@@ -861,7 +894,7 @@ export function SettingsWindow() {
                 <button
                   type="button"
                   onClick={() => addProvider()}
-                  className="rounded-lg border border-sky-400/30 bg-sky-500/15 px-2.5 py-1 text-xs text-sky-200 transition hover:bg-sky-500/25"
+                  className="rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs text-sky-700 transition hover:bg-sky-100"
                 >
                   + 自定义
                 </button>
@@ -870,7 +903,7 @@ export function SettingsWindow() {
               {config.providers.map((provider) => (
                 <div
                   key={provider.id}
-                  className="space-y-3 rounded-2xl border border-white/12 bg-white/5 p-4"
+                  className={`space-y-3 rounded-2xl border p-4 ${cardCls}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <input
@@ -879,14 +912,14 @@ export function SettingsWindow() {
                       onChange={(e) =>
                         updateProvider(provider.id, { name: e.target.value })
                       }
-                      className="w-48 rounded-lg border border-white/12 bg-black/25 px-2.5 py-1.5 text-sm font-medium outline-none focus:border-sky-400/60 select-text"
+                      className={`w-48 rounded-lg border px-2.5 py-1.5 text-sm font-medium outline-none focus:border-sky-400/60 select-text ${inputCls}`}
                       placeholder="供应商名称"
                     />
                     {config.providers.length > 1 && (
                       <button
                         type="button"
                         onClick={() => deleteProvider(provider.id)}
-                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/20 hover:text-rose-300"
+                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
                         title="删除供应商"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -896,7 +929,7 @@ export function SettingsWindow() {
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-[11.5px] text-slate-400">
+                      <label className={`mb-1 block text-[11.5px] ${mutedCls}`}>
                         Base URL（填完失焦自动修正 /v1 并扫描模型）
                       </label>
                       <input
@@ -910,12 +943,12 @@ export function SettingsWindow() {
                         onBlur={() =>
                           void scanModelsForProvider(provider, true)
                         }
-                        className="w-full rounded-lg border border-white/12 bg-black/25 px-2.5 py-1.5 text-xs outline-none focus:border-sky-400/60 select-text"
+                        className={`w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:border-sky-400/60 select-text ${inputCls}`}
                         placeholder="https://api.openai.com/v1"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-[11.5px] text-slate-400">
+                      <label className={`mb-1 block text-[11.5px] ${mutedCls}`}>
                         API Key（填完自动从接口拉取可用模型）
                       </label>
                       <div className="relative">
@@ -930,7 +963,7 @@ export function SettingsWindow() {
                           onBlur={() =>
                             void scanModelsForProvider(provider, true)
                           }
-                          className="w-full rounded-lg border border-white/12 bg-black/25 py-1.5 pl-2.5 pr-8 text-xs outline-none focus:border-sky-400/60 select-text"
+                          className={`w-full rounded-lg border py-1.5 pl-2.5 pr-8 text-xs outline-none focus:border-sky-400/60 select-text ${inputCls}`}
                           placeholder="sk-..."
                         />
                         <button
@@ -941,7 +974,7 @@ export function SettingsWindow() {
                               [provider.id]: !prev[provider.id],
                             }))
                           }
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                         >
                           {showKeys[provider.id] ? (
                             <EyeOff className="h-3.5 w-3.5" />
@@ -957,7 +990,7 @@ export function SettingsWindow() {
                   <div className="space-y-2.5 pt-1">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11.5px] text-slate-400">
+                        <span className={`text-[11.5px] ${mutedCls}`}>
                           已启用模型列表
                         </span>
                         {scannedModels[provider.id] && (
@@ -968,7 +1001,7 @@ export function SettingsWindow() {
                                 cur === provider.id ? null : provider.id
                               )
                             }
-                            className="rounded-full bg-emerald-500/18 px-2 py-0.5 text-[11px] text-emerald-200 hover:bg-emerald-500/28"
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700 transition hover:bg-emerald-100"
                           >
                             已发现 {scannedModels[provider.id].length} 个可用模型{" "}
                             {openPickerPid === provider.id ? "▲" : "▼"}
@@ -983,7 +1016,7 @@ export function SettingsWindow() {
                             void scanModelsForProvider(provider, false)
                           }
                           disabled={scanningPid === provider.id}
-                          className="flex items-center gap-1 rounded-lg border border-sky-400/35 bg-sky-500/15 px-2.5 py-1 text-[11.5px] font-medium text-sky-200 transition hover:bg-sky-500/25 disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11.5px] font-medium text-sky-700 transition hover:bg-sky-100 disabled:opacity-50"
                         >
                           <RefreshCw
                             className={`h-3 w-3 ${
@@ -999,7 +1032,7 @@ export function SettingsWindow() {
                         <button
                           type="button"
                           onClick={() => addModel(provider.id)}
-                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11.5px] text-slate-300 hover:bg-white/10"
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11.5px] text-slate-600 transition hover:bg-slate-100"
                         >
                           <Plus className="h-3 w-3" /> 手动添加
                         </button>
@@ -1007,7 +1040,7 @@ export function SettingsWindow() {
                     </div>
 
                     {scanErrors[provider.id] && (
-                      <div className="rounded-xl border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-xs text-rose-200 select-text">
+                      <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 select-text">
                         {scanErrors[provider.id]}
                       </div>
                     )}
@@ -1015,7 +1048,7 @@ export function SettingsWindow() {
                     {/* Searchable Discovered Models Drawer */}
                     {openPickerPid === provider.id &&
                       scannedModels[provider.id] && (
-                        <div className="space-y-2 rounded-xl border border-sky-400/30 bg-black/35 p-3">
+                        <div className="space-y-2 rounded-xl border border-sky-200 bg-slate-50 p-3">
                           <div className="flex items-center gap-2">
                             <div className="relative flex-1">
                               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -1029,13 +1062,13 @@ export function SettingsWindow() {
                                   }))
                                 }
                                 placeholder="搜索扫描到的模型（如 deepseek / gemini / 4o / vl / qwen）..."
-                                className="w-full rounded-lg border border-white/12 bg-black/30 py-1.5 pl-8 pr-3 text-xs outline-none focus:border-sky-400/60 select-text"
+                                className={`w-full rounded-lg border py-1.5 pl-8 pr-3 text-xs outline-none focus:border-sky-400/60 select-text ${inputCls}`}
                               />
                             </div>
                             <button
                               type="button"
                               onClick={() => setOpenPickerPid(null)}
-                              className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-white/10 hover:text-white"
+                              className="rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-200/70 hover:text-slate-900"
                             >
                               收起
                             </button>
@@ -1065,10 +1098,10 @@ export function SettingsWindow() {
                                 return (
                                   <div
                                     key={dm.id}
-                                    className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs transition ${
+                                    className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition ${
                                       added
-                                        ? "bg-sky-500/18 text-white"
-                                        : "bg-white/4 text-slate-300 hover:bg-white/10"
+                                        ? "border-sky-200/80 bg-sky-50 text-slate-900"
+                                        : "border-slate-200/70 bg-white text-slate-700 hover:bg-slate-100"
                                     }`}
                                   >
                                     <button
@@ -1082,7 +1115,7 @@ export function SettingsWindow() {
                                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                                           added
                                             ? "border-sky-400 bg-sky-500 text-white"
-                                            : "border-white/25"
+                                            : "border-slate-300"
                                         }`}
                                       >
                                         {added && (
@@ -1093,7 +1126,7 @@ export function SettingsWindow() {
                                         {dm.id}
                                       </span>
                                       {dm.vision && (
-                                        <span className="shrink-0 rounded bg-violet-400/20 px-1.5 py-0.5 text-[10px] text-violet-200">
+                                        <span className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700">
                                           识图
                                         </span>
                                       )}
@@ -1117,8 +1150,8 @@ export function SettingsWindow() {
                                       }}
                                       className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] transition ${
                                         isDefault
-                                          ? "bg-sky-500/35 text-sky-100"
-                                          : "bg-white/8 text-slate-300 hover:bg-sky-500/25 hover:text-sky-100"
+                                          ? "bg-sky-500 text-white"
+                                          : "bg-slate-100 text-slate-600 hover:bg-sky-100 hover:text-sky-700"
                                       }`}
                                     >
                                       {isDefault ? "当前默认" : "直接选用"}
@@ -1148,7 +1181,7 @@ export function SettingsWindow() {
                       return (
                         <div
                           key={`${provider.id}-${idx}`}
-                          className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-2"
+                          className={`flex flex-wrap items-center gap-2 rounded-xl border p-2 ${rowCls}`}
                         >
                           <input
                             type="text"
@@ -1162,7 +1195,7 @@ export function SettingsWindow() {
                               });
                             }}
                             placeholder="模型 ID（如 gpt-4o-mini）"
-                            className="min-w-[140px] flex-1 rounded-md border border-white/10 bg-black/25 px-2 py-1 text-xs outline-none focus:border-sky-400/60 select-text"
+                            className={`min-w-[140px] flex-1 rounded-md border px-2 py-1 text-xs outline-none focus:border-sky-400/60 select-text ${inputCls}`}
                           />
                           <input
                             type="text"
@@ -1175,9 +1208,9 @@ export function SettingsWindow() {
                               });
                             }}
                             placeholder="显示名称"
-                            className="w-28 rounded-md border border-white/10 bg-black/25 px-2 py-1 text-xs outline-none focus:border-sky-400/60 select-text"
+                            className={`w-28 rounded-md border px-2 py-1 text-xs outline-none focus:border-sky-400/60 select-text ${inputCls}`}
                           />
-                          <label className="flex cursor-pointer items-center gap-1 text-[11px] text-slate-300">
+                          <label className="flex cursor-pointer items-center gap-1 text-[11px] text-slate-700">
                             <input
                               type="checkbox"
                               checked={m.vision}
@@ -1195,7 +1228,7 @@ export function SettingsWindow() {
                             识图
                           </label>
                           <label
-                            className="flex cursor-pointer items-center gap-1 text-[11px] text-slate-300"
+                            className="flex cursor-pointer items-center gap-1 text-[11px] text-slate-700"
                             title="模型支持 OpenAI Function Calling（供 Agent 自主多轮联网检索）"
                           >
                             <input
@@ -1225,8 +1258,8 @@ export function SettingsWindow() {
                             }
                             className={`rounded-md px-2 py-1 text-[11px] transition ${
                               isActive
-                                ? "bg-sky-500/30 text-sky-200"
-                                : "bg-white/8 text-slate-300 hover:bg-white/15"
+                                ? "bg-sky-500/15 font-medium text-sky-700"
+                                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                             }`}
                           >
                             {isActive ? "默认" : "设为默认"}
@@ -1242,7 +1275,7 @@ export function SettingsWindow() {
                                   models: nextModels,
                                 });
                               }}
-                              className="rounded p-1 text-slate-400 hover:text-rose-300"
+                              className="rounded p-1 text-slate-400 hover:text-rose-600"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -1259,14 +1292,16 @@ export function SettingsWindow() {
           {tab === "hotkeys" && (
             <div className="space-y-5">
               {/* Section 1: Mouse Side Button */}
-              <div className="space-y-3.5 rounded-2xl border border-white/12 bg-white/5 p-4">
+              <div className={`space-y-3.5 rounded-2xl border p-4 ${cardCls}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <div className="flex items-center gap-2 text-sm font-medium text-white">
-                      <MousePointerClick className="h-4 w-4 text-sky-300" />
+                    <div
+                      className={`flex items-center gap-2 text-sm font-medium ${titleCls}`}
+                    >
+                      <MousePointerClick className={`h-4 w-4 ${iconAccentCls}`} />
                       <span>鼠标侧键快捷问 AI</span>
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className={`mt-0.5 text-xs ${mutedCls}`}>
                       选择用哪颗大拇指侧键呼出（点击即刻生效）
                     </p>
                   </div>
@@ -1280,8 +1315,8 @@ export function SettingsWindow() {
                     }
                     className={`rounded-xl border px-3 py-1.5 text-xs transition ${
                       recordingField === "mouseToggle"
-                        ? "border-sky-400 bg-sky-500/25 text-sky-100 animate-pulse"
-                        : "border-white/14 bg-white/8 text-slate-200 hover:bg-white/14"
+                        ? "border-sky-400 bg-sky-50 text-sky-700 animate-pulse"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     {recordingField === "mouseToggle"
@@ -1317,17 +1352,17 @@ export function SettingsWindow() {
                         }}
                         className={`flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition ${
                           isSelected
-                            ? "border-sky-400/70 bg-sky-500/16 shadow-sm"
-                            : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-white/6"
+                            ? "border-sky-400 bg-sky-50/90 shadow-xs"
+                            : "border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/80"
                         }`}
                       >
                         <div className="flex w-full items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[13px] font-medium text-white">
+                            <span className={`text-[13px] font-medium ${titleCls}`}>
                               {mode.title}
                             </span>
                             {mode.badge && (
-                              <span className="rounded-full bg-sky-400/20 px-1.5 py-0.5 text-[10px] font-medium text-sky-200">
+                              <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">
                                 {mode.badge}
                               </span>
                             )}
@@ -1336,13 +1371,13 @@ export function SettingsWindow() {
                             className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
                               isSelected
                                 ? "border-sky-400 bg-sky-500 text-white"
-                                : "border-white/25"
+                                : "border-slate-300"
                             }`}
                           >
                             {isSelected && <Check className="h-2.5 w-2.5" />}
                           </span>
                         </div>
-                        <p className="text-[11.5px] leading-relaxed text-slate-400">
+                        <p className={`text-[11.5px] leading-relaxed ${mutedCls}`}>
                           {mode.desc}
                         </p>
                       </button>
@@ -1356,10 +1391,10 @@ export function SettingsWindow() {
                     m.value.toLowerCase() ===
                     config.hotkeys.mouseToggle.trim().toLowerCase()
                 ) && (
-                  <div className="flex items-center justify-between rounded-xl border border-sky-400/40 bg-sky-500/15 px-3.5 py-2 text-xs text-sky-100">
+                  <div className="flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs text-sky-800">
                     <span>
                       当前已绑定组合侧键：
-                      <strong className="ml-1 font-semibold text-white">
+                      <strong className={`ml-1 font-semibold ${titleCls}`}>
                         {formatMouseComboLabel(config.hotkeys.mouseToggle)}
                       </strong>
                     </span>
@@ -1377,7 +1412,7 @@ export function SettingsWindow() {
                           "已恢复默认双侧键模式"
                         )
                       }
-                      className="text-sky-200 underline hover:text-white"
+                      className="text-sky-700 underline hover:text-sky-900"
                     >
                       切回默认
                     </button>
@@ -1386,24 +1421,24 @@ export function SettingsWindow() {
 
                 {/* Clear 3-Scene Explanation + Inline Auto-Ask Switch */}
                 {config.hotkeys.mouseToggle.trim() !== "" && (
-                  <div className="space-y-2 rounded-xl border border-white/8 bg-black/25 p-3">
-                    <div className="text-[11.5px] font-medium text-slate-300">
+                  <div className="space-y-2 rounded-xl border border-slate-200/80 bg-slate-50/90 p-3">
+                    <div className="text-[11.5px] font-medium text-slate-700">
                       按下鼠标侧键时会自动做什么？
                     </div>
                     <div className="space-y-1.5 text-xs">
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/4 px-2.5 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200/70 bg-white px-2.5 py-2">
                         <div className="flex items-center gap-2">
-                          <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[11px] font-medium text-sky-200">
+                          <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-700">
                             1. 选中文字后按
                           </span>
-                          <span className="text-slate-200">
+                          <span className="text-slate-700">
                             {config.ui.autoSubmitSelection
                               ? "自动提取选中词句，直接让 AI 翻译或解释"
                               : "自动提取选中词句填入输入框，等你输入问题"}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-slate-400">
+                          <span className={`text-[11px] ${mutedCls}`}>
                             直接解答
                           </span>
                           <ToggleSwitch
@@ -1426,20 +1461,20 @@ export function SettingsWindow() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 rounded-lg bg-white/4 px-2.5 py-1.5">
-                        <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-[11px] font-medium text-violet-200">
+                      <div className="flex items-center gap-2 rounded-lg border border-slate-200/70 bg-white px-2.5 py-1.5">
+                        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-medium text-violet-700">
                           2. 刚截完图后按
                         </span>
-                        <span className="text-slate-300">
+                        <span className="text-slate-600">
                           自动带上刚截好的图弹出输入框，等你提问
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 rounded-lg bg-white/4 px-2.5 py-1.5">
-                        <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-medium text-emerald-200">
+                      <div className="flex items-center gap-2 rounded-lg border border-slate-200/70 bg-white px-2.5 py-1.5">
+                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
                           3. 平时直接按
                         </span>
-                        <span className="text-slate-300">
+                        <span className="text-slate-600">
                           在悬浮球旁随时打开 / 收起 AI 输入框
                         </span>
                       </div>
@@ -1449,13 +1484,15 @@ export function SettingsWindow() {
               </div>
 
               {/* Section 2: Keyboard Shortcuts */}
-              <div className="space-y-3 rounded-2xl border border-white/12 bg-white/5 p-4">
+              <div className={`space-y-3 rounded-2xl border p-4 ${cardCls}`}>
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-white">
-                    <Keyboard className="h-4 w-4 text-sky-300" />
+                  <div
+                    className={`flex items-center gap-2 text-sm font-medium ${titleCls}`}
+                  >
+                    <Keyboard className={`h-4 w-4 ${iconAccentCls}`} />
                     <span>键盘快捷键</span>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-400">
+                  <p className={`mt-0.5 text-xs ${mutedCls}`}>
                     点击右侧按键框即可按下新组合键替换（按 Esc 取消）
                   </p>
                 </div>
@@ -1471,15 +1508,15 @@ export function SettingsWindow() {
                     return (
                       <div
                         key={item.field}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5"
+                        className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 ${rowCls}`}
                       >
                         <div className="min-w-0">
-                          <div className="text-[13px] text-white">
+                          <div className={`text-[13px] ${titleCls}`}>
                             {item.title}
                           </div>
-                          <div className="text-[11px] text-slate-400">
+                          <div className={`text-[11px] ${mutedCls}`}>
                             {bindErr?.error ? (
-                              <span className="text-rose-300">
+                              <span className="text-rose-600">
                                 {bindErr.error}
                               </span>
                             ) : (
@@ -1496,8 +1533,8 @@ export function SettingsWindow() {
                             }
                             className={`flex min-w-[136px] items-center justify-center gap-1 rounded-xl border px-3 py-1.5 text-xs transition ${
                               isRec
-                                ? "border-sky-400 bg-sky-500/25 text-sky-100 animate-pulse"
-                                : "border-white/14 bg-white/8 text-slate-200 hover:bg-white/14"
+                                ? "border-sky-400 bg-sky-50 text-sky-700 animate-pulse"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
                             }`}
                           >
                             {isRec ? (
@@ -1509,15 +1546,15 @@ export function SettingsWindow() {
                                   className="inline-flex items-center gap-1"
                                 >
                                   {i > 0 && (
-                                    <span className="text-slate-500">+</span>
+                                    <span className="text-slate-400">+</span>
                                   )}
-                                  <kbd className="rounded border border-white/18 bg-black/35 px-1.5 py-0.5 font-mono text-[11px] text-slate-100">
+                                  <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] text-slate-800 shadow-2xs">
                                     {k}
                                   </kbd>
                                 </span>
                               ))
                             ) : (
-                              <span className="text-slate-500">未设置</span>
+                              <span className="text-slate-400">未设置</span>
                             )}
                           </button>
 
@@ -1537,7 +1574,7 @@ export function SettingsWindow() {
                                 )
                               }
                               title={`恢复默认 (${item.defaultValue})`}
-                              className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-sky-200"
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/70 hover:text-sky-700"
                             >
                               <RotateCcw className="h-3.5 w-3.5" />
                             </button>
@@ -1559,7 +1596,7 @@ export function SettingsWindow() {
                                 )
                               }
                               title="清空此快捷键"
-                              className="rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-rose-300"
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -1572,18 +1609,22 @@ export function SettingsWindow() {
               </div>
 
               {/* Section 3: Anti-conflict & App Exceptions */}
-              <div className="space-y-3 rounded-2xl border border-white/12 bg-white/5 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-white">
-                  <ShieldCheck className="h-4 w-4 text-sky-300" />
+              <div className={`space-y-3 rounded-2xl border p-4 ${cardCls}`}>
+                <div
+                  className={`flex items-center gap-2 text-sm font-medium ${titleCls}`}
+                >
+                  <ShieldCheck className={`h-4 w-4 ${iconAccentCls}`} />
                   <span>游戏与软件防误触</span>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+                <div
+                  className={`flex items-center justify-between gap-4 rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+                >
                   <div>
-                    <div className="text-[13px] text-white">
+                    <div className={`text-[13px] ${titleCls}`}>
                       全屏游戏 / 全屏看视频时自动暂停侧键
                     </div>
-                    <div className="text-[11px] text-slate-400">
+                    <div className={`text-[11px] ${mutedCls}`}>
                       全屏画面下自动忽略鼠标侧键，绝不切出游戏或打断观影
                     </div>
                   </div>
@@ -1627,12 +1668,18 @@ export function SettingsWindow() {
           )}
 
           {tab === "ui" && (
-            <div className="space-y-3 rounded-2xl border border-white/12 bg-white/5 p-4">
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+            <div className={`space-y-3 rounded-2xl border p-4 ${cardCls}`}>
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-[11.5px] leading-relaxed text-sky-800">
+                BTW-Float 默认在后台常驻运行（任务管理器归类为「后台进程」，不占用任务栏与 Alt+Tab 列表）并默认显示桌面悬浮球。关闭设置或问答框后会继续留在后台；如需彻底退出，请点击托盘图标选择「退出 BTW-Float」。
+              </div>
+
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">显示桌面悬浮球</div>
-                  <div className="text-[11px] text-slate-400">
-                    隐藏后仍可通过鼠标侧键、键盘快捷键或系统托盘呼出
+                  <div className={`text-[13px] ${titleCls}`}>显示桌面悬浮球</div>
+                  <div className={`text-[11px] ${mutedCls}`}>
+                    默认开启，可在此或点击系统托盘图标随时隐藏；隐藏后仍可通过鼠标侧键、快捷键或托盘图标呼出
                   </div>
                 </div>
                 <ToggleSwitch
@@ -1646,10 +1693,12 @@ export function SettingsWindow() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">悬浮球贴边半隐藏</div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[13px] ${titleCls}`}>悬浮球贴边半隐藏</div>
+                  <div className={`text-[11px] ${mutedCls}`}>
                     拖至屏幕左右边缘时自动收起大半，鼠标移过去再滑出
                   </div>
                 </div>
@@ -1664,12 +1713,14 @@ export function SettingsWindow() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">
+                  <div className={`text-[13px] ${titleCls}`}>
                     点击外部自动收起并清空对话
                   </div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[11px] ${mutedCls}`}>
                     未点击图钉固定时，点窗口外面自动隐藏并清空本次提问
                   </div>
                 </div>
@@ -1684,12 +1735,14 @@ export function SettingsWindow() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">
+                  <div className={`text-[13px] ${titleCls}`}>
                     划词后按侧键直接自动问 AI
                   </div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[11px] ${mutedCls}`}>
                     选中文字按侧键立刻翻译/解释（关闭则先填入输入框等你提问）
                   </div>
                 </div>
@@ -1704,12 +1757,14 @@ export function SettingsWindow() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">
+                  <div className={`text-[13px] ${titleCls}`}>
                     默认开启免费联网搜索
                   </div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[11px] ${mutedCls}`}>
                     AI 需要查最新资料时自动联网检索并整合进回答
                   </div>
                 </div>
@@ -1724,12 +1779,14 @@ export function SettingsWindow() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">
+                  <div className={`text-[13px] ${titleCls}`}>
                     显示联网搜索的参考网站来源
                   </div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[11px] ${mutedCls}`}>
                     默认关闭以保持回答界面清爽；开启后在回答底部显示参考网页链接
                   </div>
                 </div>
@@ -1744,11 +1801,13 @@ export function SettingsWindow() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">开机自动启动</div>
-                  <div className="text-[11px] text-slate-400">
-                    进入系统后自动在后台运行
+                  <div className={`text-[13px] ${titleCls}`}>开机自动启动</div>
+                  <div className={`text-[11px] ${mutedCls}`}>
+                    开机后自动在系统托盘后台静默常驻
                   </div>
                 </div>
                 <ToggleSwitch
@@ -1762,12 +1821,14 @@ export function SettingsWindow() {
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-3.5 py-2.5">
+              <div
+                className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 ${rowCls}`}
+              >
                 <div>
-                  <div className="text-[13px] text-white">
+                  <div className={`text-[13px] ${titleCls}`}>
                     截图自动附带有效时间（秒）
                   </div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[11px] ${mutedCls}`}>
                     刚截完图多少秒内按侧键会自动挂上这张图（每张图只自动挂一次）
                   </div>
                 </div>
@@ -1789,16 +1850,16 @@ export function SettingsWindow() {
                     })
                   }
                   onBlur={() => commitConfig(config)}
-                  className="w-20 rounded-lg border border-white/14 bg-black/30 px-2.5 py-1 text-center text-xs outline-none select-text"
+                  className={`w-20 rounded-lg border px-2.5 py-1 text-center text-xs outline-none select-text ${inputCls}`}
                 />
               </div>
 
               {/* Customizable quick suggestion prompts */}
-              <div className="space-y-2 rounded-xl border border-white/8 bg-black/20 p-3.5">
+              <div className={`space-y-2 rounded-xl border p-3.5 ${rowCls}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-[13px] text-white">常用快捷提问词</div>
-                    <div className="text-[11px] text-slate-400">
+                    <div className={`text-[13px] ${titleCls}`}>常用快捷提问词</div>
+                    <div className={`text-[11px] ${mutedCls}`}>
                       平时直接打开输入框时，在下方显示的快捷问题按钮
                     </div>
                   </div>
@@ -1813,7 +1874,7 @@ export function SettingsWindow() {
                         },
                       })
                     }
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11.5px] text-sky-300 hover:bg-sky-400/15"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11.5px] text-sky-600 hover:bg-sky-50"
                   >
                     <Plus className="h-3 w-3" /> 添加
                   </button>
@@ -1834,7 +1895,7 @@ export function SettingsWindow() {
                           });
                         }}
                         placeholder="输入快捷提问..."
-                        className="flex-1 rounded-lg border border-white/12 bg-black/25 px-2.5 py-1.5 text-xs outline-none focus:border-sky-400/60 select-text"
+                        className={`flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:border-sky-400/60 select-text ${inputCls}`}
                       />
                       {config.ui.quickPrompts.length > 1 && (
                         <button
@@ -1850,7 +1911,7 @@ export function SettingsWindow() {
                               },
                             })
                           }
-                          className="rounded p-1 text-slate-400 hover:text-rose-300"
+                          className="rounded p-1 text-slate-400 hover:text-rose-600"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>

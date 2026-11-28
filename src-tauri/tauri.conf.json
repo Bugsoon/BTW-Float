@@ -25,7 +25,9 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "focusable": false,
-        "visible": true
+        "focus": false,
+        "theme": "Light",
+        "visible": false
       },
       {
         "label": "popup",
@@ -39,6 +41,7 @@
         "shadow": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
+        "theme": "Light",
         "visible": false
       }
     ],

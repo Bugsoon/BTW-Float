@@ -21,12 +21,14 @@
 
 | 窗口 Label | 生命周期 | 尺寸（逻辑 px） | 职责与特性 |
 | --- | --- | --- | --- |
-| `ball` | 常驻 | `86×86`（内置 `52×52` 圆形球 + 阴影留白） | 透明无边框、置顶、`skipTaskbar`、`focusable: false`；通过 Win32 子类化实现无焦点点击、原生拖拽与文件拖放（`WM_DROPFILES`）。 |
-| `popup` | 预热隐藏 | `584×100` 起（随内容动态伸缩至最高 `610`） | 透明无边框磨砂胶囊；按悬浮球位置锚定弹出（悬浮球隐藏时退回光标/屏幕上方）；支持按住拖动、连续追问、`Ctrl+V` 贴图、拖放文本/图片。 |
-| `capture` | 按需创建，用完销毁 | 覆盖当前显示器全屏 | 独立线程创建，展示冻结底图并按 `[0..1]` 归一化比例裁剪，避免多屏/高分屏 DPI 偏差。 |
-| `settings` | 按需创建，关闭销毁 | 标准设置窗口 | 独立线程创建避免阻塞主消息循环；包含「模型与 API」「快捷键与侧键」「悬浮球与交互」三个分组，开关与快捷键改动即刻自动生效。 |
+| `ball` | 常驻（默认显示，可在设置/托盘中随时隐藏） | `86×86`（内置 `52×52` 圆形球 + 阴影留白） | 透明无边框、置顶、`WS_EX_TOOLWINDOW` 后台工具窗口、`focusable: false` / `focus: false`；启动时先锁定工具窗口样式并贴边停靠再按配置显隐，通过 Win32 子类化实现无焦点点击、原生拖拽与文件拖放（`WM_DROPFILES`）。 |
+| `popup` | 预热隐藏 | `584×100` 起（随内容动态伸缩至最高 `610`） | 透明无边框磨砂胶囊（锁定 `WS_EX_TOOLWINDOW`）；按悬浮球位置锚定弹出（悬浮球隐藏时退回光标/屏幕上方）；支持按住拖动、连续追问、`Ctrl+V` 贴图、拖放文本/图片；拦截关闭转为隐藏。 |
+| `capture` | 按需创建，用完销毁 | 覆盖当前显示器全屏 | 独立线程创建（锁定 `WS_EX_TOOLWINDOW`），展示冻结底图并按 `[0..1]` 归一化比例裁剪，避免多屏/高分屏 DPI 偏差。 |
+| `settings` | 按需创建，关闭销毁 | 标准设置窗口 | 独立线程创建避免阻塞主消息循环；包含「模型与 API」「快捷键与侧键」「后台与交互」三个分组，开关与快捷键改动即刻自动生效，关闭后程序仍留驻系统托盘后台。 |
 
-> **渲染说明**：透明无边框窗口（`ball`、`popup`）在 Windows 11 WebView2 上采用纯透明 DirectComposition 合成 + CSS 磨砂渐变与 3σ 阴影留白，不使用 `SetWindowRgn` 或 `SetWindowCompositionAttribute`，避免圆角裁切异常、黑框或拖动掉帧。
+> **渲染与后台常驻说明**：
+> - 透明无边框窗口（`ball`、`popup`）在 Windows 11 WebView2 上采用纯透明 DirectComposition 合成 + CSS 磨砂渐变与 3σ 阴影留白，不使用 `SetWindowRgn` 或 `SetWindowCompositionAttribute`，避免圆角裁切异常、黑框或拖动掉帧。
+> - **系统级后台常驻**：`ball`、`popup` 与 `capture` 均在 Win32 层面通过 `WM_STYLECHANGING` 子类化锁定 `WS_EX_TOOLWINDOW` 并清除 `WS_EX_APPWINDOW`，避免 `tao` 在显示/隐藏时将其归入任务管理器「应用（前台）」或 Alt+Tab/Win+Tab；拦截 `CloseRequested` 与 `RunEvent::ExitRequested` 防止误退，仅托盘右键「退出 BTW-Float」显式退出；通过命名互斥锁与 `HWND_MESSAGE` IPC 实现单实例唤醒。
 
 ---
 
